@@ -5,18 +5,70 @@
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2"><i class="fas fa-users"></i> Gerenciar Usuários</h1>
-</div>
-
-<div class="alert alert-info">
-    <h4><i class="fas fa-info-circle"></i> Módulo em Desenvolvimento</h4>
-    <p class="mb-0">O módulo de gerenciamento de usuários está sendo desenvolvido.</p>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('usuarios_novo') }}" class="btn btn-success">
+            <i class="fas fa-plus"></i> Novo Usuário
+        </a>
+    </div>
 </div>
 
 <div class="card">
-    <div class="card-body text-center py-5">
-        <i class="fas fa-tools fa-3x text-muted mb-3"></i>
-        <h3>Em Breve</h3>
-        <p class="text-muted">Cadastro e gestão de usuários do sistema</p>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th scope="col">ID</th>
+                        <th scope="col">Nome</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Perfil</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usuario in usuarios %}
+                    <tr>
+                        <td>{{ usuario.id }}</td>
+                        <td>{{ usuario.nome }}</td>
+                        <td>{{ usuario.email }}</td>
+                        <td>
+                            <span class="badge {% if usuario.is_admin() %}bg-primary{% else %}bg-secondary{% endif %}">
+                                {{ usuario.perfil|title }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if usuario.ativo %}
+                                <span class="badge bg-success">Ativo</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inativo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('usuarios_editar', id=usuario.id) }}" class="btn btn-primary btn-sm"
+                               title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            
+                            {% if usuario.ativo and usuario.id != current_user.id %}
+                            <form method="POST" action="{{ url_for('usuarios_deletar', id=usuario.id) }}" 
+                                  style="display: inline;"
+                                  onsubmit="return confirm('Tem certeza que deseja DESATIVAR este usuário?');">
+                                <button type="submit" class="btn btn-danger btn-sm" title="Desativar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center">Nenhum usuário cadastrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}

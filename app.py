@@ -243,7 +243,7 @@ def fechar_caixa():
                          total_vendas_count=total_vendas_count)
 
 # =============================================================================
-# ROTAS DO MENU (PLACEHOLDERS)
+# ROTAS DO MENU (ADMIN E PDV)
 # =============================================================================
 
 @app.route('/produtos')
@@ -258,6 +258,8 @@ def produtos():
     produtos_lista = Produto.query.filter_by(ativo=True).all()
     return render_template('produtos.html', produtos=produtos_lista)
 
+# --- INÍCIO GERENCIAMENTO DE USUÁRIOS (CRUD) ---
+
 @app.route('/usuarios')
 @login_required
 def usuarios():
@@ -266,9 +268,121 @@ def usuarios():
         flash('Acesso não autorizado!', 'danger')
         return redirect(url_for('dashboard'))
     
-    # Placeholder - será implementado depois
-    usuarios_lista = Usuario.query.filter_by(ativo=True).all()
-    return render_template('usuarios.html', usuarios=usuarios_lista)
+    usuarios_lista = Usuario.query.order_by(Usuario.nome).all()
+    # CORREÇÃO: Apontando para 'usuarios.htm'
+    return render_template('usuarios.htm', usuarios=usuarios_lista)
+
+@app.route('/usuarios/novo', methods=['GET', 'POST'])
+@login_required
+def usuarios_novo():
+    """Rota para criar novo usuário"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        nome = request.form.get('nome')
+        email = request.form.get('email')
+        senha = request.form.get('senha')
+        perfil = request.form.get('perfil')
+
+        # Verifica se o email já existe
+        if Usuario.query.filter_by(email=email).first():
+            flash('Este email já está cadastrado.', 'danger')
+            return render_template('usuario_form.htm', 
+                                 nome=nome, email=email, perfil=perfil)
+        
+        # Validação de senha
+        if not senha:
+             flash('A senha é obrigatória para novos usuários.', 'danger')
+             return render_template('usuario_form.htm', 
+                                  nome=nome, email=email, perfil=perfil)
+
+        novo_usuario = Usuario(
+            nome=nome,
+            email=email,
+            perfil=perfil,
+            ativo=True
+        )
+        novo_usuario.set_senha(senha)
+        
+        db.session.add(novo_usuario)
+        db.session.commit()
+        
+        flash('Usuário criado com sucesso!', 'success')
+        return redirect(url_for('usuarios'))
+
+    # Método GET: exibe o formulário vazio
+    return render_template('usuario_form.htm')
+
+
+@app.route('/usuarios/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def usuarios_editar(id):
+    """Rota para editar um usuário existente"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('dashboard'))
+
+    usuario = Usuario.query.get_or_404(id)
+
+    if request.method == 'POST':
+        # Pega os dados do formulário
+        usuario.nome = request.form.get('nome')
+        email_novo = request.form.get('email')
+        usuario.perfil = request.form.get('perfil')
+        senha = request.form.get('senha')
+        
+        # Verifica se o email foi alterado e se o novo email já existe
+        if email_novo != usuario.email and Usuario.query.filter_by(email=email_novo).first():
+             flash('Este email já pertence a outro usuário.', 'danger')
+             return render_template('usuario_form.htm', usuario=usuario)
+
+        usuario.email = email_novo
+
+        # Atualiza a senha APENAS se o campo não estiver vazio
+        if senha:
+            usuario.set_senha(senha)
+            flash('Usuário e senha atualizados com sucesso!', 'success')
+        else:
+            flash('Usuário atualizado com sucesso (senha mantida)!', 'success')
+
+        db.session.commit()
+        return redirect(url_for('usuarios'))
+
+    # Método GET: exibe o formulário preenchido com dados do usuário
+    return render_template('usuario_form.htm', usuario=usuario)
+
+
+@app.route('/usuarios/deletar/<int:id>', methods=['POST'])
+@login_required
+def usuarios_deletar(id):
+    """Rota para deletar (desativar) um usuário"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('dashboard'))
+
+    usuario = Usuario.query.get_or_404(id)
+
+    # Impede o admin de se auto-deletar
+    if usuario.id == current_user.id:
+        flash('Você não pode deletar sua própria conta de administrador!', 'danger')
+        return redirect(url_for('usuarios'))
+
+    try:
+        # Em vez de deletar, é uma boa prática desativar
+        usuario.ativo = False
+        db.session.commit()
+        flash(f'Usuário "{usuario.nome}" foi desativado.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Não foi possível remover o usuário. Erro: {str(e)}', 'danger')
+
+    return redirect(url_for('usuarios'))
+
+# --- FIM GERENCIAMENTO DE USUÁRIOS ---
+
 
 @app.route('/vendas')
 @login_required
@@ -280,9 +394,8 @@ def vendas():
         flash('É necessário abrir o caixa primeiro!', 'warning')
         return redirect(url_for('abrir_caixa'))
     
-    # Placeholder - será implementado depois
-    produtos_lista = Produto.query.filter_by(ativo=True).all()
-    return render_template('vendas.html', produtos=produtos_lista)
+    # O template 'vendas.html' agora cuida da busca de produtos via API
+    return render_template('vendas.html')
 
 @app.route('/relatorios')
 @login_required
@@ -290,6 +403,132 @@ def relatorios():
     """Rota para relatórios"""
     # Placeholder - será implementado depois
     return render_template('relatorios.html')
+
+
+# =============================================================================
+# ROTAS DO PDV (PONTO DE VENDA) - API
+# =============================================================================
+
+@app.route('/api/produto/<string:codigo_barras>')
+@login_required
+def api_buscar_produto(codigo_barras):
+    """
+    API para buscar produto pelo código de barras.
+    Chamado pelo JavaScript do PDV.
+    """
+    # Verifica se o caixa está aberto
+    caixa_aberto, _ = get_caixa_aberto()
+    if not caixa_aberto:
+        return jsonify({'error': 'Caixa está fechado!'}), 403
+    
+    produto = Produto.query.filter_by(codigo_barras=codigo_barras, ativo=True).first()
+    
+    if not produto:
+        return jsonify({'error': 'Produto não encontrado'}), 404
+        
+    if produto.estoque_atual <= 0:
+        return jsonify({'error': f'Produto sem estoque: {produto.nome}'}), 400
+        
+    return jsonify({
+        'id': produto.id,
+        'nome': produto.nome,
+        'preco_venda': produto.preco_venda,
+        'estoque_atual': produto.estoque_atual
+    })
+
+@app.route('/vendas/finalizar', methods=['POST'])
+@login_required
+def finalizar_venda():
+    """
+    API para finalizar a venda.
+    Recebe os dados do carrinho via JSON do JavaScript.
+    """
+    # Verifica se o caixa está aberto
+    caixa_aberto, movimento_atual = get_caixa_aberto()
+    if not caixa_aberto:
+        return jsonify({'error': 'Caixa está fechado!'}), 403
+
+    # Pega os dados enviados pelo JavaScript
+    data = request.get_json()
+    
+    if not data or 'itens' not in data or not data['itens']:
+        return jsonify({'error': 'Carrinho vazio'}), 400
+
+    try:
+        # Inicia a transação
+        
+        valor_total_venda = 0
+        itens_venda_db = []
+        
+        # Gera o número da venda
+        numero_venda = f"V{int(datetime.now().timestamp())}"
+        
+        # Cria a Venda principal
+        nova_venda = Venda(
+            numero_venda=numero_venda,
+            valor_total=0, # Será calculado
+            valor_pago=float(data.get('valor_pago', 0)),
+            forma_pagamento=data.get('forma_pagamento', 'dinheiro'),
+            status='finalizada',
+            usuario_id=current_user.id
+        )
+        
+        # Loop nos itens do carrinho para validar estoque e calcular total
+        for item_json in data['itens']:
+            produto = Produto.query.get(item_json['id'])
+            quantidade = int(item_json['quantidade'])
+            
+            if not produto:
+                raise Exception(f'Produto ID {item_json["id"]} não encontrado.')
+                
+            if produto.estoque_atual < quantidade:
+                raise Exception(f'Estoque insuficiente para {produto.nome}. (Disponível: {produto.estoque_atual})')
+
+            # Atualiza estoque
+            produto.estoque_atual -= quantidade
+            
+            # Calcula subtotal
+            preco_unitario = produto.preco_venda
+            subtotal = preco_unitario * quantidade
+            valor_total_venda += subtotal
+            
+            # Cria o ItemVenda
+            novo_item_venda = ItemVenda(
+                produto_id=produto.id,
+                quantidade=quantidade,
+                preco_unitario=preco_unitario,
+                subtotal=subtotal
+            )
+            itens_venda_db.append(novo_item_venda)
+
+        # Atualiza a Venda principal com os valores corretos
+        nova_venda.valor_total = valor_total_venda
+        
+        # Calcula o troco
+        if nova_venda.forma_pagamento == 'dinheiro':
+            nova_venda.troco = nova_venda.valor_pago - nova_venda.valor_total
+            if nova_venda.troco < 0:
+                 raise Exception('Valor pago em dinheiro é insuficiente.')
+        else:
+            nova_venda.valor_pago = valor_total_venda # Garante que valor pago é o total
+            nova_venda.troco = 0
+
+        # Adiciona os itens à venda (o backref cuida do venda_id)
+        nova_venda.itens = itens_venda_db
+        
+        # Salva tudo no banco
+        db.session.add(nova_venda)
+        db.session.commit()
+        
+        return jsonify({
+            'success': 'Venda finalizada com sucesso!',
+            'venda_id': nova_venda.id,
+            'numero_venda': nova_venda.numero_venda
+        })
+
+    except Exception as e:
+        db.session.rollback() # Desfaz qualquer mudança no banco em caso de erro
+        return jsonify({'error': str(e)}), 400
 
 # =============================================================================
 # INICIALIZAÇÃO DO BANCO DE DADOS
@@ -353,6 +592,17 @@ def init_db():
                     categoria='Alimentos',
                     estoque_atual=20,
                     estoque_minimo=5
+                ),
+                # Adicionando produto do exemplo da imagem
+                Produto(
+                    codigo_barras='7898927019217',
+                    nome='SALGADINHO DORITOS 28G',
+                    descricao='Salgadinho de milho',
+                    preco_venda=4.50,
+                    preco_custo=2.50,
+                    categoria='Salgadinhos',
+                    estoque_atual=100,
+                    estoque_minimo=20
                 )
             ]
             
@@ -370,5 +620,14 @@ def init_db():
             print("=" * 50)
 
 if __name__ == '__main__':
-    init_db()
+    # Garante que o init_db() rode dentro do contexto da app
+    with app.app_context():
+        # Verifica se o banco de dados já existe antes de inicializar
+        db_path = os.path.join(app.instance_path, 'loja.db')
+        if not os.path.exists(db_path):
+            print("Banco de dados não encontrado. Inicializando...")
+            init_db()
+        else:
+            print("Banco de dados já existe. Pulando inicialização.")
+            
     app.run(debug=True, host='0.0.0.0', port=5000)
