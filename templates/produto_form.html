@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if produto %}Editar Produto{% else %}Novo Produto{% endif %} - Sistema de Caixa
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-header {% if produto %}bg-primary text-white{% else %}bg-success text-white{% endif %}">
+                <h4>
+                    {% if produto %}
+                        <i class="fas fa-edit"></i> Editar Produto: {{ produto.nome }}
+                    {% else %}
+                        <i class="fas fa-plus"></i> Novo Produto
+                    {% endif %}
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{% if produto %}{{ url_for('produtos_editar', id=produto.id) }}{% else %}{{ url_for('produtos_novo') }}{% endif %}" enctype="multipart/form-data">
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="nome" class="form-label">Nome do Produto:</label>
+                                <input type="text" class="form-control" id="nome" name="nome" 
+                                       value="{{ produto.nome if produto else '' }}" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="codigo_barras" class="form-label">Código de Barras (SKU):</label>
+                                <input type="text" class="form-control" id="codigo_barras" name="codigo_barras"
+                                       value="{{ produto.codigo_barras if produto else '' }}" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="descricao" class="form-label">Descrição:</label>
+                                <textarea class="form-control" id="descricao" name="descricao" rows="3">{{ produto.descricao if produto else '' }}</textarea>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="preco_venda" class="form-label">Preço de Venda (R$):</label>
+                                    <input type="number" step="0.01" class="form-control" id="preco_venda" name="preco_venda"
+                                           value="{{ produto.preco_venda if produto else '0.00' }}" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="preco_custo" class="form-label">Preço de Custo (R$):</label>
+                                    <input type="number" step="0.01" class="form-control" id="preco_custo" name="preco_custo"
+                                           value="{{ produto.preco_custo if produto else '0.00' }}" required>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="estoque_atual" class="form-label">Estoque Atual:</label>
+                                    <input type="number" class="form-control" id="estoque_atual" name="estoque_atual"
+                                           value="{{ produto.estoque_atual if produto else '0' }}" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="estoque_minimo" class="form-label">Estoque Mínimo:</label>
+                                    <input type="number" class="form-control" id="estoque_minimo" name="estoque_minimo"
+                                           value="{{ produto.estoque_minimo if produto else '0' }}" required>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="categoria" class="form-label">Categoria:</label>
+                                <input type="text" class="form-control" id="categoria" name="categoria"
+                                       value="{{ produto.categoria if produto else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="imagem" class="form-label">Imagem do Produto:</label>
+                                <input type="file" class="form-control" id="imagem" name="imagem" accept="image/*">
+                            </div>
+                            
+                            {% if produto and produto.imagem_url %}
+                            <div class="text-center">
+                                <img src="{{ url_for('static', filename=produto.imagem_url.replace('static/', '', 1)) }}" 
+                                     alt="{{ produto.nome }}" class="img-thumbnail" style="max-height: 250px;">
+                                <small class="d-block text-muted">Imagem Atual</small>
+                            </div>
+                            {% else %}
+                            <div class="text-center bg-light p-4 rounded">
+                                <i class="fas fa-image fa-3x text-muted"></i>
+                                <p class="text-muted mt-2">Sem imagem</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('produtos') }}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn {% if produto %}btn-primary{% else %}btn-success{% endif %}">
+                            <i class="fas fa-save"></i> 
+                            {% if produto %}Salvar Alterações{% else %}Criar Produto{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

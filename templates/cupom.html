@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cupom Venda #{{ venda.numero_venda }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #f4f4f4;
+        }
+        .cupom {
+            width: 380px; /* Largura de cupom térmico */
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border: 1px dashed #ccc;
+            /* Usamos uma fonte monoespaçada para alinhar melhor os preços */
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            color: #000;
+        }
+        .cupom-header {
+            text-align: center;
+            border-bottom: 1px dashed #ccc;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .cupom-header h5 {
+            margin: 0;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        .cupom-info {
+            font-size: 0.85rem;
+        }
+        
+        .cupom-body th, .cupom-body td {
+            padding: 2px 0;
+        }
+        /* Alinhamentos da tabela de itens */
+        .col-produto { text-align: left; width: 55%;}
+        .col-qtd { text-align: center; }
+        .col-vl { text-align: right; }
+        .col-sub { text-align: right; width: 25%;}
+
+        .item-row .nome-produto {
+            font-weight: bold;
+        }
+        .item-row .detalhes {
+            font-size: 0.8rem;
+            padding-left: 5px;
+        }
+
+        .cupom-total {
+            border-top: 1px dashed #ccc;
+            padding-top: 10px;
+            margin-top: 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .cupom-pagamento {
+            font-size: 0.9rem;
+            font-weight: normal;
+        }
+        
+        .cupom-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.85rem;
+        }
+        .no-print {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        /* Estilos para Impressão */
+        @media print {
+            .no-print {
+                display: none;
+            }
+            body {
+                background-color: #fff;
+                margin: 0;
+            }
+            .cupom {
+                margin: 0;
+                width: 100%;
+                max-width: 100%;
+                border: none;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="cupom">
+        <div class="cupom-header">
+            <h5>NOME DA SUA LOJA</h5>
+            <p class="mb-0">Rua Fictícia, 123 - Bairro, Cidade-UF</p>
+            <p class="mb-0">CNPJ: 00.000.000/0001-00</p>
+            <p class="mb-0 fw-bold">CUPOM NÃO FISCAL</p>
+            <hr class="my-1">
+            <div class="cupom-info text-start">
+                <div><strong>Venda:</strong> #{{ venda.numero_venda }}</div>
+                <div><strong>Data:</strong> {{ venda.data_venda.strftime('%d/%m/%Y %H:%M:%S') }}</div>
+                <div><strong>Operador:</strong> {{ venda.operador.nome }}</div>
+            </div>
+        </div>
+
+        <div class="cupom-body">
+            <table class="table table-borderless table-sm" style="font-family: 'Courier New', Courier, monospace;">
+                <thead>
+                    <tr>
+                        <th class="col-produto">PRODUTO</th>
+                        <th class="col-qtd">QTD</th>
+                        <th class="col-vl">VL.UN</th>
+                        <th class="col-sub">SUBTOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in venda.itens %}
+                    <tr class="item-row">
+                        <td class="col-produto nome-produto">{{ item.produto.nome }}</td>
+                        <td class="col-qtd fw-bold">{{ item.quantidade }}</td>
+                        <td class="col-vl">{{ "%.2f"|format(item.preco_unitario) }}</td>
+                        <td class="col-sub fw-bold">R$ {{ "%.2f"|format(item.subtotal) }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="cupom-total">
+            <div class="d-flex justify-content-between">
+                <span>TOTAL</span>
+                <span>R$ {{ "%.2f"|format(venda.valor_total) }}</span>
+            </div>
+            
+            <div class="cupom-pagamento mt-2">
+                <div class="d-flex justify-content-between">
+                    <span>Forma Pgto:</span>
+                    <span>{{ venda.forma_pagamento|title }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Valor Pago:</span>
+                    <span>R$ {{ "%.2f"|format(venda.valor_pago) }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Troco:</span>
+                    <span>R$ {{ "%.2f"|format(venda.troco) }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="cupom-footer">
+            <p>Obrigado e volte sempre!</p>
+        </div>
+    </div>
+
+    <div class="no-print container" style="width: 380px;">
+        <button onclick="window.print()" class="btn btn-primary w-100">
+            <i class="fas fa-print"></i> Imprimir Cupom
+        </button>
+        <button onclick="window.close()" class="btn btn-secondary w-100 mt-2">
+            Fechar Janela
+        </button>
+    </div>
+
+</body>
+</html>

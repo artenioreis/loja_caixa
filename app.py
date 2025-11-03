@@ -2,8 +2,23 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from database import db
 from models import Usuario, Produto, Venda, ItemVenda, MovimentoCaixa
-from datetime import datetime, timedelta
+# Importações de data/hora atualizadas
+from datetime import datetime, timedelta, date
 import os
+# NOVAS IMPORTAÇÕES PARA UPLOAD E NOME DE ARQUIVO SEGURO
+from werkzeug.utils import secure_filename
+
+# --- CONFIGURAÇÕES DE UPLOAD ---
+# Caminho relativo (a partir da raiz do app) para servir os arquivos
+UPLOAD_FOLDER_REL = 'static/uploads/produtos'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+def allowed_file(filename):
+    """Verifica se a extensão do arquivo é permitida"""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# -------------------------------
+
 
 def create_app():
     """
@@ -16,6 +31,16 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///loja.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
+    # --- CONFIGURAÇÕES DE UPLOAD ---
+    # Caminho absoluto para salvar os arquivos
+    UPLOAD_FOLDER_ABS = os.path.join(app.root_path, UPLOAD_FOLDER_REL)
+    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER_ABS
+    app.config['UPLOAD_FOLDER_REL'] = UPLOAD_FOLDER_REL # Salva o relativo para usar nos templates
+    
+    # Cria o diretório de uploads se não existir
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    # -------------------------------
+
     # Inicializações
     db.init_app(app)
     
@@ -33,7 +58,8 @@ login_manager.login_message = 'Por favor, faça login para acessar esta página.
 @login_manager.user_loader
 def load_user(user_id):
     """Carrega o usuário a partir do ID na sessão"""
-    return Usuario.query.get(int(user_id))
+    # CORREÇÃO: Usando a nova sintaxe do SQLAlchemy
+    return db.session.get(Usuario, int(user_id))
 
 # =============================================================================
 # FUNÇÃO AUXILIAR PARA VERIFICAR CAIXA ABERTO
@@ -246,6 +272,8 @@ def fechar_caixa():
 # ROTAS DO MENU (ADMIN E PDV)
 # =============================================================================
 
+# --- INÍCIO GERENCIAMENTO DE PRODUTOS (CRUD) ---
+
 @app.route('/produtos')
 @login_required
 def produtos():
@@ -254,9 +282,141 @@ def produtos():
         flash('Acesso não autorizado!', 'danger')
         return redirect(url_for('dashboard'))
     
-    # Placeholder - será implementado depois
-    produtos_lista = Produto.query.filter_by(ativo=True).all()
+    # AGORA BUSCA OS PRODUTOS PARA LISTAR
+    produtos_lista = Produto.query.order_by(Produto.nome).all()
+    # Renderiza o novo template 'produtos.html' (que será uma lista)
     return render_template('produtos.html', produtos=produtos_lista)
+
+
+@app.route('/produtos/novo', methods=['GET', 'POST'])
+@login_required
+def produtos_novo():
+    """Rota para criar novo produto"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        codigo_barras = request.form.get('codigo_barras')
+        nome = request.form.get('nome')
+        
+        # Verifica se o código de barras já existe
+        if Produto.query.filter_by(codigo_barras=codigo_barras).first():
+            flash('Este código de barras já está cadastrado.', 'danger')
+            # Retorna o formulário com os dados preenchidos
+            return render_template('produto_form.html', produto=request.form)
+
+        novo_produto = Produto(
+            codigo_barras=codigo_barras,
+            nome=nome,
+            descricao=request.form.get('descricao'),
+            preco_venda=float(request.form.get('preco_venda', 0)),
+            preco_custo=float(request.form.get('preco_custo', 0)),
+            categoria=request.form.get('categoria'),
+            estoque_atual=int(request.form.get('estoque_atual', 0)),
+            estoque_minimo=int(request.form.get('estoque_minimo', 0)),
+            ativo=True
+        )
+        
+        # --- Lógica de Upload da Imagem ---
+        if 'imagem' in request.files:
+            file = request.files['imagem']
+            if file and file.filename != '' and allowed_file(file.filename):
+                filename = secure_filename(f"{codigo_barras}_{file.filename}")
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                # Salva o caminho *relativo* no banco
+                novo_produto.imagem_url = os.path.join(app.config['UPLOAD_FOLDER_REL'], filename).replace("\\", "/")
+        # -----------------------------------
+        
+        db.session.add(novo_produto)
+        db.session.commit()
+        
+        flash('Produto criado com sucesso!', 'success')
+        return redirect(url_for('produtos'))
+
+    # Método GET: exibe o formulário vazio
+    return render_template('produto_form.html')
+
+
+@app.route('/produtos/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def produtos_editar(id):
+    """Rota para editar um produto existente"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('dashboard'))
+
+    produto = db.session.get(Produto, id) # Usando a nova sintaxe
+    if not produto:
+        flash('Produto não encontrado.', 'danger')
+        return redirect(url_for('produtos'))
+
+    if request.method == 'POST':
+        # Pega os dados do formulário
+        codigo_barras_novo = request.form.get('codigo_barras')
+        
+        # Verifica se o código de barras foi alterado e se o novo já existe
+        if codigo_barras_novo != produto.codigo_barras and Produto.query.filter_by(codigo_barras=codigo_barras_novo).first():
+             flash('Este código de barras já pertence a outro produto.', 'danger')
+             return render_template('produto_form.html', produto=produto)
+
+        produto.codigo_barras = codigo_barras_novo
+        produto.nome = request.form.get('nome')
+        produto.descricao = request.form.get('descricao')
+        produto.preco_venda = float(request.form.get('preco_venda', 0))
+        produto.preco_custo = float(request.form.get('preco_custo', 0))
+        produto.categoria = request.form.get('categoria')
+        produto.estoque_atual = int(request.form.get('estoque_atual', 0))
+        produto.estoque_minimo = int(request.form.get('estoque_minimo', 0))
+
+        # --- Lógica de Upload da Imagem ---
+        if 'imagem' in request.files:
+            file = request.files['imagem']
+            if file and file.filename != '' and allowed_file(file.filename):
+                # (Opcional: deletar a imagem antiga)
+                
+                filename = secure_filename(f"{produto.codigo_barras}_{file.filename}")
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                produto.imagem_url = os.path.join(app.config['UPLOAD_FOLDER_REL'], filename).replace("\\", "/")
+        # -----------------------------------
+
+        db.session.commit()
+        flash('Produto atualizado com sucesso!', 'success')
+        return redirect(url_for('produtos'))
+
+    # Método GET: exibe o formulário preenchido com dados do produto
+    return render_template('produto_form.html', produto=produto)
+
+
+@app.route('/produtos/deletar/<int:id>', methods=['POST'])
+@login_required
+def produtos_deletar(id):
+    """Rota para deletar (desativar) um produto"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('dashboard'))
+
+    produto = db.session.get(Produto, id) # Usando a nova sintaxe
+    if not produto:
+        flash('Produto não encontrado.', 'danger')
+        return redirect(url_for('produtos'))
+
+    try:
+        # Em vez de deletar, desativamos
+        produto.ativo = False
+        db.session.commit()
+        flash(f'Produto "{produto.nome}" foi desativado.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Não foi possível remover o produto. Erro: {str(e)}', 'danger')
+
+    return redirect(url_for('produtos'))
+
+# --- FIM GERENCIAMENTO DE PRODUTOS ---
+
 
 # --- INÍCIO GERENCIAMENTO DE USUÁRIOS (CRUD) ---
 
@@ -269,7 +429,6 @@ def usuarios():
         return redirect(url_for('dashboard'))
     
     usuarios_lista = Usuario.query.order_by(Usuario.nome).all()
-    # CORREÇÃO: Apontando para 'usuarios.htm'
     return render_template('usuarios.htm', usuarios=usuarios_lista)
 
 @app.route('/usuarios/novo', methods=['GET', 'POST'])
@@ -324,7 +483,10 @@ def usuarios_editar(id):
         flash('Acesso não autorizado!', 'danger')
         return redirect(url_for('dashboard'))
 
-    usuario = Usuario.query.get_or_404(id)
+    usuario = db.session.get(Usuario, id) # Usando a nova sintaxe
+    if not usuario:
+        flash('Usuário não encontrado.', 'danger')
+        return redirect(url_for('usuarios'))
 
     if request.method == 'POST':
         # Pega os dados do formulário
@@ -362,7 +524,10 @@ def usuarios_deletar(id):
         flash('Acesso não autorizado!', 'danger')
         return redirect(url_for('dashboard'))
 
-    usuario = Usuario.query.get_or_404(id)
+    usuario = db.session.get(Usuario, id) # Usando a nova sintaxe
+    if not usuario:
+        flash('Usuário não encontrado.', 'danger')
+        return redirect(url_for('usuarios'))
 
     # Impede o admin de se auto-deletar
     if usuario.id == current_user.id:
@@ -397,23 +562,118 @@ def vendas():
     # O template 'vendas.html' agora cuida da busca de produtos via API
     return render_template('vendas.html')
 
+# =============================================================================
+# ROTA DE RELATÓRIOS (SUBSTITUÍDA)
+# =============================================================================
 @app.route('/relatorios')
 @login_required
 def relatorios():
     """Rota para relatórios"""
-    # Placeholder - será implementado depois
-    return render_template('relatorios.html')
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('dashboard'))
+
+    # --- Lógica de Filtro de Data ---
+    # Pega as datas do request (ex: /relatorios?inicio=...&fim=...)
+    data_inicio_str = request.args.get('inicio')
+    data_fim_str = request.args.get('fim')
+
+    # Define o padrão (hoje) se nenhuma data for fornecida
+    if not data_inicio_str:
+        data_inicio_str = date.today().strftime('%Y-%m-%d')
+    if not data_fim_str:
+        data_fim_str = date.today().strftime('%Y-%m-%d')
+
+    try:
+        # Converte as strings para objetos datetime (início do dia e fim do dia)
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+    except ValueError:
+        flash('Formato de data inválido.', 'danger')
+        data_inicio = datetime.now().replace(hour=0, minute=0, second=0)
+        data_fim = datetime.now().replace(hour=23, minute=59, second=59)
+
+    # --- 1. Consultas para o Sumário ---
+    sumario = db.session.query(
+        db.func.count(Venda.id).label('num_vendas'),
+        db.func.sum(Venda.valor_total).label('total_vendido')
+    ).filter(
+        Venda.status == 'finalizada',
+        Venda.data_venda.between(data_inicio, data_fim)
+    ).first()
+
+    # Cálculo do Ticket Médio
+    total_vendido = sumario.total_vendido or 0
+    num_vendas = sumario.num_vendas or 0
+    ticket_medio = (total_vendido / num_vendas) if num_vendas > 0 else 0
+
+    # --- 2. Consulta de Produtos Mais Vendidos ---
+    produtos_vendidos = db.session.query(
+        Produto.nome,
+        Produto.codigo_barras,
+        db.func.sum(ItemVenda.quantidade).label('total_quantidade'),
+        db.func.sum(ItemVenda.subtotal).label('total_arrecadado')
+    ).join(ItemVenda, ItemVenda.produto_id == Produto.id)\
+     .join(Venda, Venda.id == ItemVenda.venda_id)\
+     .filter(
+        Venda.status == 'finalizada',
+        Venda.data_venda.between(data_inicio, data_fim)
+     )\
+     .group_by(Produto.id)\
+     .order_by(db.func.sum(ItemVenda.quantidade).desc())\
+     .limit(10)\
+     .all()
+
+    # --- 3. Consulta de Itens Vendidos (Detalhado) ---
+    # Esta consulta foi modificada para buscar ItemVenda em vez de Venda
+    itens_vendidos_detalhe = db.session.query(ItemVenda).join(Venda).join(Produto).filter(
+        Venda.status == 'finalizada',
+        Venda.data_venda.between(data_inicio, data_fim)
+    ).order_by(Venda.data_venda.desc()).all()
+
+
+    return render_template('relatorios.html',
+                         data_inicio=data_inicio_str,
+                         data_fim=data_fim_str,
+                         total_vendido=total_vendido,
+                         num_vendas=num_vendas,
+                         ticket_medio=ticket_medio,
+                         produtos_vendidos=produtos_vendidos,
+                         # Passa a nova lista de itens para o template
+                         itens_vendidos_detalhe=itens_vendidos_detalhe)
+
+
+# --- NOVA ROTA PARA O CUPOM ---
+@app.route('/venda/cupom/<int:venda_id>')
+@login_required
+def cupom_venda(venda_id):
+    """
+    Exibe o cupom (recibo) de uma venda finalizada para impressão.
+    """
+    venda = db.session.get(Venda, venda_id) # Usando a nova sintaxe
+    if not venda:
+        flash('Venda não encontrada.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Verificação de segurança: Apenas o admin ou o operador que fez a venda podem vê-la
+    if not current_user.is_admin() and venda.usuario_id != current_user.id:
+        flash('Acesso não autorizado a este cupom.', 'danger')
+        return redirect(url_for('dashboard'))
+            
+    # Renderiza um novo template 'cupom.html'
+    return render_template('cupom.html', venda=venda)
 
 
 # =============================================================================
 # ROTAS DO PDV (PONTO DE VENDA) - API
 # =============================================================================
 
-@app.route('/api/produto/<string:codigo_barras>')
+# --- ROTA DA API MODIFICADA (BUSCA POR CÓDIGO E ID) ---
+@app.route('/api/produto/<string:codigo>')
 @login_required
-def api_buscar_produto(codigo_barras):
+def api_buscar_produto(codigo):
     """
-    API para buscar produto pelo código de barras.
+    API para buscar produto pelo código de barras OU pelo ID.
     Chamado pelo JavaScript do PDV.
     """
     # Verifica se o caixa está aberto
@@ -421,19 +681,43 @@ def api_buscar_produto(codigo_barras):
     if not caixa_aberto:
         return jsonify({'error': 'Caixa está fechado!'}), 403
     
-    produto = Produto.query.filter_by(codigo_barras=codigo_barras, ativo=True).first()
+    produto = None
     
+    # 1. Tenta buscar pelo Código de Barras primeiro
+    produto = Produto.query.filter_by(codigo_barras=codigo, ativo=True).first()
+    
+    # 2. Se não encontrou, tenta buscar pelo ID (Código do Produto)
+    if not produto:
+        try:
+            # Tenta converter o código para um inteiro (ID)
+            produto_id = int(codigo)
+            produto = db.session.get(Produto, produto_id) # Usando a nova sintaxe
+            # Verifica se o produto encontrado por ID está ativo
+            if produto and not produto.ativo:
+                produto = None # Se não estiver ativo, trata como não encontrado
+        except ValueError:
+            # Se o código não for um número, ignora a busca por ID
+            pass
+
+    # 3. Verifica o resultado da busca
     if not produto:
         return jsonify({'error': 'Produto não encontrado'}), 404
         
     if produto.estoque_atual <= 0:
         return jsonify({'error': f'Produto sem estoque: {produto.nome}'}), 400
         
+    # GERA A URL DA IMAGEM SE ELA EXISTIR
+    imagem_path = None
+    if produto.imagem_url:
+        # Usa url_for para gerar o caminho correto
+        imagem_path = url_for('static', filename=produto.imagem_url.replace('static/', '', 1))
+        
     return jsonify({
         'id': produto.id,
         'nome': produto.nome,
         'preco_venda': produto.preco_venda,
-        'estoque_atual': produto.estoque_atual
+        'estoque_atual': produto.estoque_atual,
+        'imagem_url': imagem_path
     })
 
 @app.route('/vendas/finalizar', methods=['POST'])
@@ -475,7 +759,7 @@ def finalizar_venda():
         
         # Loop nos itens do carrinho para validar estoque e calcular total
         for item_json in data['itens']:
-            produto = Produto.query.get(item_json['id'])
+            produto = db.session.get(Produto, item_json['id']) # Usando a nova sintaxe
             quantidade = int(item_json['quantidade'])
             
             if not produto:
@@ -631,3 +915,4 @@ if __name__ == '__main__':
             print("Banco de dados já existe. Pulando inicialização.")
             
     app.run(debug=True, host='0.0.0.0', port=5000)
+

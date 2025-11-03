@@ -4,9 +4,7 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
 class Usuario(db.Model, UserMixin):
-    """
-    Modelo para usuários do sistema (Administrador e Caixa)
-    """
+    # ... (código do Usuário existente - sem alteração) ...
     __tablename__ = 'usuarios'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -51,13 +49,14 @@ class Produto(db.Model):
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # NOVO CAMPO PARA IMAGEM
+    imagem_url = db.Column(db.String(200), nullable=True) # Armazena o caminho relativo da imagem
+    
     # Relacionamento com itens de venda
     itens_venda = db.relationship('ItemVenda', backref='produto', lazy=True)
 
 class Venda(db.Model):
-    """
-    Modelo para registrar as vendas
-    """
+    # ... (código da Venda existente - sem alteração) ...
     __tablename__ = 'vendas'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -74,9 +73,7 @@ class Venda(db.Model):
     itens = db.relationship('ItemVenda', backref='venda', lazy=True, cascade='all, delete-orphan')
 
 class ItemVenda(db.Model):
-    """
-    Modelo para itens de cada venda
-    """
+    # ... (código do ItemVenda existente - sem alteração) ...
     __tablename__ = 'itens_venda'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -87,9 +84,7 @@ class ItemVenda(db.Model):
     subtotal = db.Column(db.Float, nullable=False)
 
 class MovimentoCaixa(db.Model):
-    """
-    Modelo para controle de abertura/fechamento de caixa
-    """
+    # ... (código do MovimentoCaixa existente - sem alteração) ...
     __tablename__ = 'movimento_caixa'
     
     id = db.Column(db.Integer, primary_key=True)

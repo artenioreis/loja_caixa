@@ -14,6 +14,20 @@
         border-radius: 5px;
         border: 1px solid #dee2e6;
     }
+    /* Estilo para info do produto */
+    #produto-info {
+        min-height: 200px; /* Aumenta altura para caber a imagem */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    #produto-info-img {
+        max-height: 120px;
+        max-width: 100%;
+        object-fit: contain;
+        margin-bottom: 10px;
+    }
 </style>
 {% endblock %}
 
@@ -35,12 +49,12 @@
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label for="codigo_barras" class="form-label">Código de Barras:</label>
+                    <label for="codigo_barras" class="form-label">Código de Barras ou ID:</label>
                     <input type="text" class="form-control form-control-lg" id="codigo_barras" 
                            placeholder="Leia o código ou digite..." autofocus>
                 </div>
                 
-                <div id="produto-info" class="text-center p-3 bg-light rounded" style="min-height: 150px;">
+                <div id="produto-info" class="text-center p-3 bg-light rounded">
                     <p class="text-muted">Aguardando produto...</p>
                 </div>
                 
@@ -101,7 +115,7 @@
                     </div>
                 </div>
                 <div class="d-grid gap-2 mt-3">
-                    <button classs="btn btn-success btn-lg" id="btn-finalizar" data-bs-toggle="modal" data-bs-target="#modalFinalizar">
+                    <button class="btn btn-success btn-lg" id="btn-finalizar" data-bs-toggle="modal" data-bs-target="#modalFinalizar">
                         <i class="fas fa-check"></i> Finalizar Venda (F6)
                     </button>
                     <button class="btn btn-danger" id="btn-cancelar">
@@ -194,10 +208,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /**
      * Busca o produto na API do backend
+     * Adicionamos forceSearch para pular a verificação de 3 caracteres
      */
-    async function buscarProduto() {
+    async function buscarProduto(forceSearch = false) {
         const codigo = inputCodigoBarras.value;
-        if (codigo.length < 3) { // Evita buscas desnecessárias
+
+        // Se a busca NÃO for forçada (Enter) E o código for < 3, ele para.
+        if (!forceSearch && codigo.length < 3) {
+            limparInfoProduto();
+            return;
+        }
+
+        // Adiciona uma verificação para código vazio
+        if (codigo.length === 0) {
             limparInfoProduto();
             return;
         }
@@ -215,12 +238,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const produto = await response.json();
             produtoAtual = produto; // Armazena o produto encontrado
             
+            // --- ATUALIZAÇÃO PARA MOSTRAR IMAGEM ---
+            let img_html = '';
+            if (produto.imagem_url) {
+                // A API agora retorna a URL completa
+                img_html = `<img src="${produto.imagem_url}" alt="${produto.nome}" id="produto-info-img">`;
+            } else {
+                img_html = '<i class="fas fa-image fa-3x text-muted mb-2"></i>';
+            }
+            
             // Atualiza o painel de informações
             infoProdutoDiv.innerHTML = `
-                <h4 class="text-primary">${produto.nome}</h4>
-                <h2 class="fw-bold">R$ ${produto.preco_venda.toFixed(2)}</h2>
+                ${img_html}
+                <h5 class="text-primary mb-0">${produto.nome}</h5>
+                <h3 class="fw-bold">R$ ${produto.preco_venda.toFixed(2)}</h3>
                 <small class="text-muted">Estoque: ${produto.estoque_atual}</small>
             `;
+            // ----------------------------------------
             
             // Foca na quantidade para o usuário confirmar
             inputQuantidade.focus();
@@ -334,7 +368,7 @@ document.addEventListener('DOMContentLoaded', function() {
      * Limpa toda a venda
      */
     function cancelarVenda() {
-        if (confirm('Tem certeza que deseja cancelar a venda atual?')) {
+        if (carrinho.length > 0 && confirm('Tem certeza que deseja cancelar a venda atual?')) {
             carrinho = [];
             renderizarCarrinho();
             limparFormularioProduto();
@@ -412,8 +446,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const result = await response.json();
             
-            // Sucesso!
-            alert(`Venda #${result.venda_id} finalizada com sucesso!`);
+            // =======================================================
+            // MODIFICAÇÃO AQUI: Abrir o cupom em nova janela
+            // =======================================================
+            window.open('/venda/cupom/' + result.venda_id, '_blank', 'width=500,height=700');
+            // =======================================================
             
             // Limpa tudo
             carrinho = [];
@@ -438,14 +475,24 @@ document.addEventListener('DOMContentLoaded', function() {
     let typingTimer;
     inputCodigoBarras.addEventListener('keyup', (e) => {
         clearTimeout(typingTimer);
+        // Se pressionar Enter, busca e tenta adicionar imediatamente
         if (e.key === 'Enter') {
-            buscarProduto().then(() => {
+            // Passa true para forçar a busca, ignorando o limite de 3 caracteres
+            buscarProduto(true).then(() => {
                 if(produtoAtual) {
                     adicionarAoCarrinho();
                 }
             });
         } else {
-             typingTimer = setTimeout(buscarProduto, 500); // 500ms delay
+             // Caso contrário, espera o usuário parar de digitar
+             
+             // ***** INÍCIO DA CORREÇÃO *****
+             // Envolvemos a chamada em uma função anônima para garantir
+             // que 'buscarProduto(false)' seja chamado corretamente.
+             typingTimer = setTimeout(() => {
+                buscarProduto(false); 
+             }, 500);
+             // ***** FIM DA CORREÇÃO *****
         }
     });
     
@@ -473,7 +520,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'F6') {
             e.preventDefault();
             if(carrinho.length > 0) {
-                atualizarModalPagamento();
+                atualizarModalPagamento(); 
                 modal.show();
             }
         }
