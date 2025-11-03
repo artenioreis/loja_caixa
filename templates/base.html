@@ -47,13 +47,14 @@
                     </h5>
                     
                     <ul class="nav flex-column">
+                        
+                        <!-- Itens apenas para Admin -->
+                        {% if current_user.is_admin() %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('dashboard') }}">
                                 <i class="fas fa-tachometer-alt"></i> Dashboard
                             </a>
                         </li>
-                        
-                        {% if current_user.is_admin() %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('produtos') }}">
                                 <i class="fas fa-boxes"></i> Produtos
@@ -64,17 +65,18 @@
                                 <i class="fas fa-users"></i> Usuários
                             </a>
                         </li>
-                        {% endif %}
-                        
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('vendas') }}">
-                                <i class="fas fa-shopping-cart"></i> PDV - Vendas
-                            </a>
-                        </li>
-                        
+                        <!-- MODIFICAÇÃO: Movido para dentro do bloco admin -->
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('relatorios') }}">
                                 <i class="fas fa-chart-bar"></i> Relatórios
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        <!-- Itens para todos (Admin e Caixa) -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('vendas') }}">
+                                <i class="fas fa-shopping-cart"></i> PDV - Vendas
                             </a>
                         </li>
                         
@@ -129,3 +131,4 @@
     {% block extra_js %}{% endblock %}
 </body>
 </html>
+

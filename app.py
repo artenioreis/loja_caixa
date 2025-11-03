@@ -85,7 +85,11 @@ def get_caixa_aberto():
 def index():
     """Página inicial - redireciona para login ou dashboard"""
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
+        # Se for admin, vai pro dashboard
+        if current_user.is_admin():
+            return redirect(url_for('dashboard'))
+        # Se for caixa, vai direto pras vendas
+        return redirect(url_for('vendas'))
     return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -95,7 +99,9 @@ def login():
     """
     # Se o usuário já está logado, redireciona para o dashboard
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
+        if current_user.is_admin():
+            return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
     
     if request.method == 'POST':
         email = request.form.get('email')
@@ -108,11 +114,15 @@ def login():
         if usuario and usuario.check_senha(senha):
             login_user(usuario)
             
-            # Redireciona para a página que tentava acessar ou dashboard
+            # Redireciona para a página que tentava acessar ou dashboard/vendas
             next_page = request.args.get('next')
             if next_page:
                 return redirect(next_page)
-            return redirect(url_for('dashboard'))
+            
+            if current_user.is_admin():
+                return redirect(url_for('dashboard'))
+            else:
+                return redirect(url_for('vendas'))
         else:
             flash('Email ou senha incorretos!', 'danger')
     
@@ -155,8 +165,12 @@ def inject_context():
 @login_required
 def dashboard():
     """
-    Dashboard principal do sistema
+    Dashboard principal do sistema (Apenas Admin)
     """
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('vendas'))
+
     # Estatísticas para o dashboard
     hoje = datetime.now().date()
     
@@ -200,7 +214,7 @@ def abrir_caixa():
     
     if caixa_aberto:
         flash('Já existe um caixa aberto!', 'warning')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
     
     if request.method == 'POST':
         saldo_inicial = float(request.form.get('saldo_inicial', 0))
@@ -216,7 +230,7 @@ def abrir_caixa():
         db.session.commit()
         
         flash('Caixa aberto com sucesso!', 'success')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
     
     return render_template('abrir_caixa.html')
 
@@ -231,7 +245,10 @@ def fechar_caixa():
     
     if not caixa_aberto:
         flash('Não há caixa aberto para fechar!', 'warning')
-        return redirect(url_for('dashboard'))
+        if current_user.is_admin():
+            return redirect(url_for('dashboard'))
+        else:
+            return redirect(url_for('vendas'))
     
     if request.method == 'POST':
         saldo_final = float(request.form.get('saldo_final', 0))
@@ -239,6 +256,7 @@ def fechar_caixa():
         # Calcula total de vendas do período
         vendas_periodo = Venda.query.filter(
             Venda.data_venda >= movimento_atual.data_abertura,
+            Venda.usuario_id == current_user.id, # Apenas vendas deste usuário
             Venda.status == 'finalizada'
         ).all()
         
@@ -252,11 +270,15 @@ def fechar_caixa():
         db.session.commit()
         
         flash(f'Caixa fechado com sucesso! Total de vendas: R$ {total_vendas:.2f}', 'success')
-        return redirect(url_for('dashboard'))
+        if current_user.is_admin():
+            return redirect(url_for('dashboard'))
+        else:
+            return redirect(url_for('vendas'))
     
     # Calcula estatísticas para exibir no fechamento
     vendas_periodo = Venda.query.filter(
         Venda.data_venda >= movimento_atual.data_abertura,
+        Venda.usuario_id == current_user.id, # Apenas vendas deste usuário
         Venda.status == 'finalizada'
     ).all()
     
@@ -280,7 +302,7 @@ def produtos():
     """Rota para gerenciamento de produtos (apenas admin)"""
     if not current_user.is_admin():
         flash('Acesso não autorizado!', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
     
     # AGORA BUSCA OS PRODUTOS PARA LISTAR
     produtos_lista = Produto.query.order_by(Produto.nome).all()
@@ -294,7 +316,7 @@ def produtos_novo():
     """Rota para criar novo produto"""
     if not current_user.is_admin():
         flash('Acesso não autorizado!', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
 
     if request.method == 'POST':
         codigo_barras = request.form.get('codigo_barras')
@@ -345,7 +367,7 @@ def produtos_editar(id):
     """Rota para editar um produto existente"""
     if not current_user.is_admin():
         flash('Acesso não autorizado!', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
 
     produto = db.session.get(Produto, id) # Usando a nova sintaxe
     if not produto:
@@ -396,7 +418,7 @@ def produtos_deletar(id):
     """Rota para deletar (desativar) um produto"""
     if not current_user.is_admin():
         flash('Acesso não autorizado!', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
 
     produto = db.session.get(Produto, id) # Usando a nova sintaxe
     if not produto:
@@ -426,7 +448,7 @@ def usuarios():
     """Rota para gerenciamento de usuários (apenas admin)"""
     if not current_user.is_admin():
         flash('Acesso não autorizado!', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
     
     usuarios_lista = Usuario.query.order_by(Usuario.nome).all()
     return render_template('usuarios.htm', usuarios=usuarios_lista)
@@ -437,7 +459,7 @@ def usuarios_novo():
     """Rota para criar novo usuário"""
     if not current_user.is_admin():
         flash('Acesso não autorizado!', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
 
     if request.method == 'POST':
         nome = request.form.get('nome')
@@ -481,7 +503,7 @@ def usuarios_editar(id):
     """Rota para editar um usuário existente"""
     if not current_user.is_admin():
         flash('Acesso não autorizado!', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
 
     usuario = db.session.get(Usuario, id) # Usando a nova sintaxe
     if not usuario:
@@ -522,7 +544,7 @@ def usuarios_deletar(id):
     """Rota para deletar (desativar) um usuário"""
     if not current_user.is_admin():
         flash('Acesso não autorizado!', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
 
     usuario = db.session.get(Usuario, id) # Usando a nova sintaxe
     if not usuario:
@@ -563,20 +585,30 @@ def vendas():
     return render_template('vendas.html')
 
 # =============================================================================
-# ROTA DE RELATÓRIOS (SUBSTITUÍDA)
+# ROTA DE RELATÓRIOS (ATUALIZADA)
 # =============================================================================
 @app.route('/relatorios')
 @login_required
 def relatorios():
-    """Rota para relatórios"""
+    """Rota para relatórios (Apenas Admin)"""
     if not current_user.is_admin():
         flash('Acesso não autorizado!', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
 
     # --- Lógica de Filtro de Data ---
-    # Pega as datas do request (ex: /relatorios?inicio=...&fim=...)
     data_inicio_str = request.args.get('inicio')
     data_fim_str = request.args.get('fim')
+    
+    # --- Lógica de Filtro de Caixa (Usuário) ---
+    caixa_id_str = request.args.get('caixa_id', '0') # '0' significa "Todos"
+    caixa_selecionado = 0
+    try:
+        caixa_selecionado = int(caixa_id_str)
+    except ValueError:
+        caixa_selecionado = 0 # Volta para "Todos" se o valor for inválido
+
+    # --- Lógica de Filtro de Forma de Pagamento ---
+    forma_pgto_selecionada = request.args.get('forma_pgto', 'todos') # 'todos' é o padrão
 
     # Define o padrão (hoje) se nenhuma data for fornecida
     if not data_inicio_str:
@@ -593,14 +625,31 @@ def relatorios():
         data_inicio = datetime.now().replace(hour=0, minute=0, second=0)
         data_fim = datetime.now().replace(hour=23, minute=59, second=59)
 
+    # Busca todos os caixas (usuários) para o filtro dropdown
+    caixas = Usuario.query.order_by(Usuario.nome).all()
+    nome_filtro = "Geral (Todos os Caixas)"
+
     # --- 1. Consultas para o Sumário ---
-    sumario = db.session.query(
+    query_sumario = db.session.query(
         db.func.count(Venda.id).label('num_vendas'),
         db.func.sum(Venda.valor_total).label('total_vendido')
     ).filter(
         Venda.status == 'finalizada',
         Venda.data_venda.between(data_inicio, data_fim)
-    ).first()
+    )
+    
+    # Aplica filtro de caixa se um específico foi selecionado
+    if caixa_selecionado > 0:
+        query_sumario = query_sumario.filter(Venda.usuario_id == caixa_selecionado)
+        usuario_filtro = db.session.get(Usuario, caixa_selecionado)
+        if usuario_filtro:
+            nome_filtro = f"Caixa: {usuario_filtro.nome}"
+
+    # Aplica filtro de forma de pagamento
+    if forma_pgto_selecionada != 'todos':
+        query_sumario = query_sumario.filter(Venda.forma_pagamento == forma_pgto_selecionada)
+
+    sumario = query_sumario.first()
 
     # Cálculo do Ticket Médio
     total_vendido = sumario.total_vendido or 0
@@ -608,7 +657,7 @@ def relatorios():
     ticket_medio = (total_vendido / num_vendas) if num_vendas > 0 else 0
 
     # --- 2. Consulta de Produtos Mais Vendidos ---
-    produtos_vendidos = db.session.query(
+    query_produtos = db.session.query(
         Produto.nome,
         Produto.codigo_barras,
         db.func.sum(ItemVenda.quantidade).label('total_quantidade'),
@@ -618,18 +667,40 @@ def relatorios():
      .filter(
         Venda.status == 'finalizada',
         Venda.data_venda.between(data_inicio, data_fim)
-     )\
-     .group_by(Produto.id)\
-     .order_by(db.func.sum(ItemVenda.quantidade).desc())\
-     .limit(10)\
-     .all()
+     )
+    
+    # Aplica filtro de caixa
+    if caixa_selecionado > 0:
+        query_produtos = query_produtos.filter(Venda.usuario_id == caixa_selecionado)
 
-    # --- 3. Consulta de Itens Vendidos (Detalhado) ---
-    # Esta consulta foi modificada para buscar ItemVenda em vez de Venda
-    itens_vendidos_detalhe = db.session.query(ItemVenda).join(Venda).join(Produto).filter(
+    # Aplica filtro de forma de pagamento
+    if forma_pgto_selecionada != 'todos':
+        query_produtos = query_produtos.filter(Venda.forma_pagamento == forma_pgto_selecionada)
+
+    produtos_vendidos = query_produtos.group_by(Produto.id)\
+                                      .order_by(db.func.sum(ItemVenda.quantidade).desc())\
+                                      .limit(10)\
+                                      .all()
+
+    # --- 3. Consulta de Itens Vendidos (Detalhe) ---
+    query_itens = db.session.query(
+        ItemVenda
+    ).join(Venda, Venda.id == ItemVenda.venda_id)\
+     .join(Produto, Produto.id == ItemVenda.produto_id)\
+     .filter(
         Venda.status == 'finalizada',
         Venda.data_venda.between(data_inicio, data_fim)
-    ).order_by(Venda.data_venda.desc()).all()
+     )
+    
+    # Aplica filtro de caixa
+    if caixa_selecionado > 0:
+        query_itens = query_itens.filter(Venda.usuario_id == caixa_selecionado)
+        
+    # Aplica filtro de forma de pagamento
+    if forma_pgto_selecionada != 'todos':
+        query_itens = query_itens.filter(Venda.forma_pagamento == forma_pgto_selecionada)
+
+    itens_vendidos_detalhe = query_itens.order_by(Venda.data_venda.desc()).all()
 
 
     return render_template('relatorios.html',
@@ -639,8 +710,12 @@ def relatorios():
                          num_vendas=num_vendas,
                          ticket_medio=ticket_medio,
                          produtos_vendidos=produtos_vendidos,
-                         # Passa a nova lista de itens para o template
-                         itens_vendidos_detalhe=itens_vendidos_detalhe)
+                         itens_vendidos_detalhe=itens_vendidos_detalhe,
+                         caixas=caixas, # Envia a lista de caixas para o filtro
+                         caixa_selecionado=caixa_selecionado, # Envia o ID do caixa selecionado
+                         nome_filtro=nome_filtro, # Envia o nome do filtro
+                         forma_pgto_selecionada=forma_pgto_selecionada # Envia a forma de pgto
+                         )
 
 
 # --- NOVA ROTA PARA O CUPOM ---
@@ -658,7 +733,7 @@ def cupom_venda(venda_id):
     # Verificação de segurança: Apenas o admin ou o operador que fez a venda podem vê-la
     if not current_user.is_admin() and venda.usuario_id != current_user.id:
         flash('Acesso não autorizado a este cupom.', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
             
     # Renderiza um novo template 'cupom.html'
     return render_template('cupom.html', venda=venda)
@@ -747,15 +822,22 @@ def finalizar_venda():
         # Gera o número da venda
         numero_venda = f"V{int(datetime.now().timestamp())}"
         
+        # --- INÍCIO DA CORREÇÃO (NoneType para float) ---
+        # Pega o valor_pago do JSON
+        valor_pago_json = data.get('valor_pago')
+        # Garante que não seja NoneType antes de converter. Se for None, usa 0.
+        valor_pago_float = float(valor_pago_json or 0)
+
         # Cria a Venda principal
         nova_venda = Venda(
             numero_venda=numero_venda,
             valor_total=0, # Será calculado
-            valor_pago=float(data.get('valor_pago', 0)),
+            valor_pago=valor_pago_float, # Usa o valor seguro
             forma_pagamento=data.get('forma_pagamento', 'dinheiro'),
             status='finalizada',
             usuario_id=current_user.id
         )
+        # --- FIM DA CORREÇÃO ---
         
         # Loop nos itens do carrinho para validar estoque e calcular total
         for item_json in data['itens']:
