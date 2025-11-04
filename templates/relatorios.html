@@ -11,10 +11,12 @@
 
     /* Estilos para controlar a impressão */
     @media print {
-        /* Define o layout da página A4 */
+        /* --- INÍCIO DA MODIFICAÇÃO (Impressora Térmica) --- */
         @page {
-            size: A4 portrait;
-            margin: 2cm;
+            /* Define a largura para 80mm e altura automática */
+            size: 80mm auto; 
+            /* Margens pequenas para impressora térmica */
+            margin: 5mm; 
         }
 
         /* Esconde tudo por padrão */
@@ -35,7 +37,14 @@
             padding: 0;
             border: none !important;
             box-shadow: none !important;
+            
+            /* Define fonte e tamanho para a impressão */
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 8px; /* Fonte muito pequena para tentar caber 6 colunas */
+            color: #000;
         }
+        /* --- FIM DA MODIFICAÇÃO --- */
+
         /* Esconde elementos que não devem ser impressos (botões, etc.) */
         .no-print {
             display: none !important;
@@ -46,8 +55,8 @@
             display: block !important;
             visibility: visible !important;
             text-align: center;
-            font-size: 1.5rem;
-            margin-bottom: 20px;
+            font-size: 1.1rem; /* Fonte menor para 80mm */
+            margin-bottom: 10px;
         }
 
         /* Ajusta o estilo da tabela escura para economizar tinta */
@@ -57,12 +66,21 @@
            -webkit-print-color-adjust: exact; /* Força o fundo no Chrome */
            color-adjust: exact;
         }
+        
+        /* Ajustes finos da tabela para 80mm */
         .table {
             color: #000 !important;
+            font-size: 8px; /* Força o tamanho da fonte */
+            word-break: break-all; /* Quebra nomes longos de produtos */
         }
+        .table th, .table td {
+            padding: 1px 2px; /* Reduz o padding */
+        }
+
         /* Garante que o rodapé da tabela seja impresso corretamente */
         tfoot {
             display: table-footer-group;
+            font-size: 9px; /* Total um pouco maior */
         }
         /* Esconde o cabeçalho do card na impressão */
         .card-header {

@@ -2,11 +2,73 @@
 
 {% block title %}Login - Sistema de Caixa{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Estilo para a imagem de fundo */
+    body {
+        /* IMAGEM ATUALIZADA CONFORME SOLICITADO */
+        background-image: url('https://i.pinimg.com/736x/df/4b/a6/df4ba66c68fe8ad4d1f74ac2e9f4ca58.jpg');
+        
+        /* MANTIDO: 'contain' (diminui para caber) conforme solicitação anterior */
+        background-size: contain; 
+        
+        /* 'cover': Cobre a tela inteira (pode cortar a imagem) */
+        /* background-size: cover; */
+        /* 'auto': Tamanho original da imagem */
+        /* background-size: auto; */
+
+
+        /* MANTIDO: 'left center' (alinha à esquerda) conforme solicitação anterior */
+        background-position: left center;
+
+        /* 'center': Centraliza a imagem (Horizontal e Vertical) */
+        /* background-position: center; */
+        /* 'left top': Alinha no canto superior esquerdo */
+        /* background-position: left top; */
+        /* 'right center': Alinha à direita, no meio vertical */
+        /* background-position: right center; */
+
+
+        background-repeat: no-repeat;
+        background-attachment: fixed; /* Mantém o fundo fixo ao rolar */
+    }
+    
+    /* Faz o card de login ficar levemente transparente */
+    .card-login {
+        background-color: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(5px);
+    }
+
+    /* Estilo para as credenciais de teste */
+    .credenciais-teste {
+        color: white;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    }
+    
+    /* CSS PARA DIMINUIR OS INPUTS (MANTIDO) */
+    .form-control-sm-custom {
+        /* Diminui a altura e o padding do campo de texto */
+        height: calc(1.5em + 0.5rem + 2px);
+        padding: 0.25rem 0.5rem;
+        font-size: 0.9rem; /* Tamanho da fonte ligeiramente menor */
+    }
+    
+    .input-group-text-sm-custom {
+        /* Diminui o padding do ícone para acompanhar o input */
+        padding: 0.25rem 0.5rem;
+        font-size: 0.9rem;
+    }
+    /* --- FIM DO NOVO CSS --- */
+
+</style>
+{% endblock %}
+
 {% block content_public %}
-<div class="container">
-    <div class="row justify-content-center mt-5">
-        <div class="col-md-6 col-lg-4">
-            <div class="card shadow">
+<div class="container-fluid min-vh-100 d-flex flex-column align-items-center justify-content-center p-3">
+    
+    <div class="row justify-content-center w-100">
+        <div class="col-md-5 col-lg-3">
+            <div class="card shadow card-login">
                 <div class="card-header bg-primary text-white text-center">
                     <h4><i class="fas fa-cash-register"></i> Sistema de Caixa</h4>
                     <small>Faça login para continuar</small>
@@ -16,8 +78,10 @@
                         <div class="mb-3">
                             <label for="email" class="form-label">Email:</label>
                             <div class="input-group">
-                                <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-                                <input type="email" class="form-control" id="email" name="email" required 
+                                <span class="input-group-text input-group-text-sm-custom">
+                                    <i class="fas fa-envelope"></i>
+                                </span>
+                                <input type="email" class="form-control form-control-sm-custom" id="email" name="email" required 
                                        placeholder="seu@email.com">
                             </div>
                         </div>
@@ -25,8 +89,10 @@
                         <div class="mb-3">
                             <label for="senha" class="form-label">Senha:</label>
                             <div class="input-group">
-                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                                <input type="password" class="form-control" id="senha" name="senha" required 
+                                <span class="input-group-text input-group-text-sm-custom">
+                                    <i class="fas fa-lock"></i>
+                                </span>
+                                <input type="password" class="form-control form-control-sm-custom" id="senha" name="senha" required 
                                        placeholder="Sua senha">
                             </div>
                         </div>
@@ -37,18 +103,17 @@
                             </button>
                         </div>
                     </form>
-                    
-                    <hr>
-                    
-                    <div class="text-center">
-                        <small class="text-muted">
-                            <strong>Credenciais de teste:</strong><br>
-                            Admin: admin@loja.com / admin123<br>
-                            Caixa: caixa@loja.com / caixa123
-                        </small>
-                    </div>
                 </div>
             </div>
+
+            <div class="text-center mt-3 credenciais-teste">
+                <small>
+                    <strong>Credenciais de teste:</strong><br>
+                    Admin: admin@loja.com / admin123<br>
+                    Caixa: caixa@loja.com / caixa123
+                </small>
+            </div>
+            
         </div>
     </div>
 </div>
