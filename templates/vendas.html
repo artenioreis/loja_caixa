@@ -212,13 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     async function buscarProduto(forceSearch = false) {
         const codigo = inputCodigoBarras.value;
-
-        // Se a busca NÃO for forçada (Enter) E o código for < 3, ele para.
-        if (!forceSearch && codigo.length < 3) {
-            limparInfoProduto();
-            return;
-        }
-
+        
         // Adiciona uma verificação para código vazio
         if (codigo.length === 0) {
             limparInfoProduto();
@@ -380,6 +374,8 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function atualizarModalPagamento() {
         const totalVenda = parseFloat(carrinho.reduce((acc, item) => acc + item.subtotal, 0));
+        // A correção da lógica do bug anterior também acontece aqui,
+        // garantindo que o cálculo do troco no modal também funcione
         const valorPago = parseFloat(inputValorPago.value) || 0;
         
         let troco = 0;
@@ -412,9 +408,16 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     async function finalizarVenda() {
         const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
-        const valorPago = parseFloat(inputValorPago.value);
+        
+        // =======================================================
+        // *** CORREÇÃO APLICADA AQUI ***
+        // Usamos '|| 0' para garantir que um campo vazio seja tratado como 0,
+        // e não como 'NaN'.
+        // =======================================================
+        const valorPago = parseFloat(inputValorPago.value) || 0;
         const formaPagamento = selectFormaPagamento.value;
 
+        // Esta verificação agora funciona corretamente, pois 'valorPago' será 0 e não NaN.
         if (formaPagamento === 'dinheiro' && valorPago < totalVenda) {
             alert('Valor pago é menor que o total da venda.');
             return;
