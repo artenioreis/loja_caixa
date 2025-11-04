@@ -744,6 +744,7 @@ def cupom_venda(venda_id):
 # =============================================================================
 
 # --- ROTA DA API MODIFICADA (BUSCA POR CÓDIGO E ID) ---
+# ***** INÍCIO DA CORREÇÃO *****
 @app.route('/api/produto/<string:codigo>')
 @login_required
 def api_buscar_produto(codigo):
@@ -782,6 +783,7 @@ def api_buscar_produto(codigo):
         return jsonify({'error': f'Produto sem estoque: {produto.nome}'}), 400
         
     # GERA A URL DA IMAGEM SE ELA EXISTIR
+    # Esta lógica agora está DEPOIS de ambas as tentativas de busca.
     imagem_path = None
     if produto.imagem_url:
         # Usa url_for para gerar o caminho correto
@@ -794,6 +796,7 @@ def api_buscar_produto(codigo):
         'estoque_atual': produto.estoque_atual,
         'imagem_url': imagem_path
     })
+# ***** FIM DA CORREÇÃO *****
 
 @app.route('/vendas/finalizar', methods=['POST'])
 @login_required
@@ -997,4 +1000,3 @@ if __name__ == '__main__':
             print("Banco de dados já existe. Pulando inicialização.")
             
     app.run(debug=True, host='0.0.0.0', port=5000)
-

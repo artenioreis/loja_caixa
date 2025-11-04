@@ -145,11 +145,25 @@
                                 <option value="pix">PIX</option>
                             </select>
                         </div>
+                        
                         <div class="mb-3" id="campo-valor-pago">
                             <label for="valor_pago" class="form-label">Valor Pago (R$):</label>
                             <input type="number" step="0.01" class="form-control form-control-lg" id="valor_pago" placeholder="0.00">
                         </div>
-                    </div>
+                        
+                        <div class="mb-3 text-center" id="campo-pix-qrcode" style="display: none;">
+                            <label class="form-label fw-bold">Pague com PIX</label>
+                            <p class="text-muted" style="font-size: 0.9rem;">
+                                Aponte a câmera para o QR Code e digite o valor total (R$ <span id="modal-total-pix">0.00</span>).
+                            </p>
+                            
+                            <img src="{{ url_for('static', filename='images/qrcode_pix_loja.png') }}" 
+                                 alt="QR Code PIX da Loja" 
+                                 class="img-fluid rounded border" 
+                                 style="max-width: 250px;">
+                        </div>
+                        </div>
+                    
                     <div class="col-md-6 bg-light p-4 rounded">
                         <h3>Total a Pagar:</h3>
                         <h1 id="modal-total-venda" class="display-5 fw-bold text-success">R$ 0.00</h1>
@@ -201,6 +215,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputValorPago = document.getElementById('valor_pago');
     const campoValorPago = document.getElementById('campo-valor-pago');
     const btnConfirmarVenda = document.getElementById('btn-confirmar-venda');
+    
+    // --- Novos Elementos PIX ---
+    const campoPixQrcode = document.getElementById('campo-pix-qrcode');
+    const modalTotalPix = document.getElementById('modal-total-pix');
 
     // =========================================================================
     // FUNÇÕES PRINCIPAIS
@@ -208,11 +226,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /**
      * Busca o produto na API do backend
-     * Adicionamos forceSearch para pular a verificação de 3 caracteres
      */
     async function buscarProduto(forceSearch = false) {
         const codigo = inputCodigoBarras.value;
+
+        // =======================================================
+        //               INÍCIO DA CORREÇÃO (JS)
+        // =======================================================
         
+        // Esta verificação de 3 caracteres estava impedindo a "busca ao vivo"
+        // de IDs curtos. A busca "Enter" (forceSearch) já funcionava.
+        // Removendo a verificação, a busca ao vivo também funcionará para IDs.
+        
+        /* LINHA PROBLEMÁTICA REMOVIDA:
+        if (!forceSearch && codigo.length < 3) {
+            limparInfoProduto();
+            return;
+        }
+        */
+        
+        // =======================================================
+        //                FIM DA CORREÇÃO (JS)
+        // =======================================================
+
+
         // Adiciona uma verificação para código vazio
         if (codigo.length === 0) {
             limparInfoProduto();
@@ -370,24 +407,35 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
-     * Lógica do modal de finalização
+     * Lógica do modal de finalização (FUNÇÃO ATUALIZADA COM PIX)
      */
     function atualizarModalPagamento() {
         const totalVenda = parseFloat(carrinho.reduce((acc, item) => acc + item.subtotal, 0));
-        // A correção da lógica do bug anterior também acontece aqui,
-        // garantindo que o cálculo do troco no modal também funcione
         const valorPago = parseFloat(inputValorPago.value) || 0;
         
         let troco = 0;
         
+        // Atualiza o valor total no modal (para ambos os lados)
+        modalTotalPix.textContent = totalVenda.toFixed(2);
+        
+        // Esconde ambos os campos dinâmicos por padrão
+        campoValorPago.style.display = 'none';
+        campoPixQrcode.style.display = 'none';
+        
+        // Verifica a forma de pagamento selecionada
         if (selectFormaPagamento.value === 'dinheiro') {
-            campoValorPago.style.display = 'block';
+            campoValorPago.style.display = 'block'; // Mostra campo "Valor Pago"
             if (valorPago > 0) {
                  troco = valorPago - totalVenda;
             }
+        } else if (selectFormaPagamVento.value === 'pix') {
+            campoPixQrcode.style.display = 'block'; // Mostra campo "QR Code"
+            // Se for PIX, o valor pago é o total da venda e não há troco
+            inputValorPago.value = totalVenda.toFixed(2);
+            troco = 0;
         } else {
-            // Se for cartão ou pix, o valor pago é o total da venda e não há troco
-            campoValorPago.style.display = 'none';
+            // 'cartao' ou outro
+            // Se for cartão, o valor pago é o total da venda e não há troco
             inputValorPago.value = totalVenda.toFixed(2);
             troco = 0;
         }
@@ -408,16 +456,9 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     async function finalizarVenda() {
         const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
-        
-        // =======================================================
-        // *** CORREÇÃO APLICADA AQUI ***
-        // Usamos '|| 0' para garantir que um campo vazio seja tratado como 0,
-        // e não como 'NaN'.
-        // =======================================================
-        const valorPago = parseFloat(inputValorPago.value) || 0;
+        const valorPago = parseFloat(inputValorPago.value);
         const formaPagamento = selectFormaPagamento.value;
 
-        // Esta verificação agora funciona corretamente, pois 'valorPago' será 0 e não NaN.
         if (formaPagamento === 'dinheiro' && valorPago < totalVenda) {
             alert('Valor pago é menor que o total da venda.');
             return;
@@ -480,7 +521,7 @@ document.addEventListener('DOMContentLoaded', function() {
         clearTimeout(typingTimer);
         // Se pressionar Enter, busca e tenta adicionar imediatamente
         if (e.key === 'Enter') {
-            // Passa true para forçar a busca, ignorando o limite de 3 caracteres
+            // Passa true para forçar a busca
             buscarProduto(true).then(() => {
                 if(produtoAtual) {
                     adicionarAoCarrinho();
@@ -488,14 +529,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         } else {
              // Caso contrário, espera o usuário parar de digitar
-             
-             // ***** INÍCIO DA CORREÇÃO *****
-             // Envolvemos a chamada em uma função anônima para garantir
-             // que 'buscarProduto(false)' seja chamado corretamente.
              typingTimer = setTimeout(() => {
                 buscarProduto(false); 
              }, 500);
-             // ***** FIM DA CORREÇÃO *****
         }
     });
     
