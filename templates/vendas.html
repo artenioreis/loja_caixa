@@ -230,26 +230,6 @@ document.addEventListener('DOMContentLoaded', function() {
     async function buscarProduto(forceSearch = false) {
         const codigo = inputCodigoBarras.value;
 
-        // =======================================================
-        //               INÍCIO DA CORREÇÃO (JS)
-        // =======================================================
-        
-        // Esta verificação de 3 caracteres estava impedindo a "busca ao vivo"
-        // de IDs curtos. A busca "Enter" (forceSearch) já funcionava.
-        // Removendo a verificação, a busca ao vivo também funcionará para IDs.
-        
-        /* LINHA PROBLEMÁTICA REMOVIDA:
-        if (!forceSearch && codigo.length < 3) {
-            limparInfoProduto();
-            return;
-        }
-        */
-        
-        // =======================================================
-        //                FIM DA CORREÇÃO (JS)
-        // =======================================================
-
-
         // Adiciona uma verificação para código vazio
         if (codigo.length === 0) {
             limparInfoProduto();
@@ -422,17 +402,28 @@ document.addEventListener('DOMContentLoaded', function() {
         campoValorPago.style.display = 'none';
         campoPixQrcode.style.display = 'none';
         
+        // =======================================================
+        //               INÍCIO DA CORREÇÃO (TYPO)
+        // =======================================================
+        
         // Verifica a forma de pagamento selecionada
         if (selectFormaPagamento.value === 'dinheiro') {
             campoValorPago.style.display = 'block'; // Mostra campo "Valor Pago"
             if (valorPago > 0) {
                  troco = valorPago - totalVenda;
             }
-        } else if (selectFormaPagamVento.value === 'pix') {
+        
+        // CORRIGIDO: Era selectFormaPagamVento.value
+        } else if (selectFormaPagamento.value === 'pix') {
             campoPixQrcode.style.display = 'block'; // Mostra campo "QR Code"
             // Se for PIX, o valor pago é o total da venda e não há troco
             inputValorPago.value = totalVenda.toFixed(2);
             troco = 0;
+        
+        // =======================================================
+        //                FIM DA CORREÇÃO (TYPO)
+        // =======================================================
+        
         } else {
             // 'cartao' ou outro
             // Se for cartão, o valor pago é o total da venda e não há troco
@@ -542,7 +533,7 @@ document.addEventListener('DOMContentLoaded', function() {
     inputQuantidade.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            adicionarAoCarrinho();
+            adicionarAoVenda();
         }
     });
     
