@@ -8,6 +8,17 @@ import os
 # NOVAS IMPORTAÇÕES PARA UPLOAD E NOME DE ARQUIVO SEGURO
 from werkzeug.utils import secure_filename
 
+# =======================================================
+#               INÍCIO DAS NOVAS IMPORTAÇÕES (EXCEL)
+# =======================================================
+import pandas as pd
+import io
+from flask import make_response
+# =======================================================
+#                FIM DAS NOVAS IMPORTAÇÕES
+# =======================================================
+
+
 # --- CONFIGURAÇÕES DE UPLOAD ---
 # Caminho relativo (a partir da raiz do app) para servir os arquivos
 UPLOAD_FOLDER_REL = 'static/uploads/produtos'
@@ -740,11 +751,100 @@ def cupom_venda(venda_id):
 
 
 # =============================================================================
+#           INÍCIO DA NOVA ROTA (EXPORTAR EXCEL)
+# =============================================================================
+@app.route('/relatorios/exportar')
+@login_required
+def exportar_relatorio():
+    """
+    Gera e baixa uma planilha Excel com os dados do relatório de vendas.
+    """
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('vendas'))
+
+    # --- 1. REPETE A LÓGICA DE FILTRO DA ROTA 'relatorios' ---
+    data_inicio_str = request.args.get('inicio', date.today().strftime('%Y-%m-%d'))
+    data_fim_str = request.args.get('fim', date.today().strftime('%Y-%m-%d'))
+    caixa_id_str = request.args.get('caixa_id', '0')
+    caixa_selecionado = int(caixa_id_str)
+    forma_pgto_selecionada = request.args.get('forma_pgto', 'todos')
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+    except ValueError:
+        data_inicio = datetime.now().replace(hour=0, minute=0, second=0)
+        data_fim = datetime.now().replace(hour=23, minute=59, second=59)
+
+    # --- 2. EXECUTA A MESMA CONSULTA DE ITENS VENDIDOS ---
+    query_itens = db.session.query(
+        ItemVenda
+    ).join(Venda, Venda.id == ItemVenda.venda_id)\
+     .join(Produto, Produto.id == ItemVenda.produto_id)\
+     .filter(
+        Venda.status == 'finalizada',
+        Venda.data_venda.between(data_inicio, data_fim)
+     )
+    
+    if caixa_selecionado > 0:
+        query_itens = query_itens.filter(Venda.usuario_id == caixa_selecionado)
+    if forma_pgto_selecionada != 'todos':
+        query_itens = query_itens.filter(Venda.forma_pagamento == forma_pgto_selecionada)
+
+    itens_vendidos_detalhe = query_itens.order_by(Venda.data_venda.desc()).all()
+
+    # --- 3. PREPARA OS DADOS PARA O PANDAS ---
+    dados_para_planilha = []
+    for item in itens_vendidos_detalhe:
+        dados_para_planilha.append({
+            'ID Venda': item.venda.id,
+            'Data Venda': item.venda.data_venda.strftime('%Y-%m-%d %H:%M:%S'),
+            'Operador': item.venda.operador.nome,
+            'Forma Pgto': item.venda.forma_pagamento.title(),
+            'ID Produto': item.produto.id,
+            'Cód. Barras': item.produto.codigo_barras,
+            'Produto': item.produto.nome,
+            'Quantidade': item.quantidade,
+            'Preço Unit. (R$)': item.preco_unitario,
+            'Subtotal (R$)': item.subtotal
+        })
+
+    if not dados_para_planilha:
+        flash('Nenhum dado encontrado para exportar.', 'warning')
+        return redirect(url_for('relatorios', **request.args))
+
+    # --- 4. GERA A PLANILHA EM MEMÓRIA ---
+    df = pd.DataFrame(dados_para_planilha)
+    
+    # Cria um buffer de Bytes em memória
+    output = io.BytesIO()
+    
+    # Escreve o DataFrame no buffer usando ExcelWriter
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Relatorio_Vendas', index=False)
+    
+    output.seek(0) # Volta ao início do buffer
+
+    # --- 5. CRIA A RESPOSTA E ENVIA O ARQUIVO ---
+    nome_arquivo = f"Relatorio_Vendas_{data_inicio_str}_a_{data_fim_str}.xlsx"
+    
+    response = make_response(output.read())
+    response.headers["Content-Disposition"] = f"attachment; filename={nome_arquivo}"
+    response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    
+    return response
+
+# =============================================================================
+#           FIM DA NOVA ROTA (EXPORTAR EXCEL)
+# =============================================================================
+
+
+# =============================================================================
 # ROTAS DO PDV (PONTO DE VENDA) - API
 # =============================================================================
 
 # --- ROTA DA API MODIFICADA (BUSCA POR CÓDIGO E ID) ---
-# ***** INÍCIO DA CORREÇÃO *****
 @app.route('/api/produto/<string:codigo>')
 @login_required
 def api_buscar_produto(codigo):
@@ -783,7 +883,6 @@ def api_buscar_produto(codigo):
         return jsonify({'error': f'Produto sem estoque: {produto.nome}'}), 400
         
     # GERA A URL DA IMAGEM SE ELA EXISTIR
-    # Esta lógica agora está DEPOIS de ambas as tentativas de busca.
     imagem_path = None
     if produto.imagem_url:
         # Usa url_for para gerar o caminho correto
@@ -796,7 +895,6 @@ def api_buscar_produto(codigo):
         'estoque_atual': produto.estoque_atual,
         'imagem_url': imagem_path
     })
-# ***** FIM DA CORREÇÃO *****
 
 @app.route('/vendas/finalizar', methods=['POST'])
 @login_required

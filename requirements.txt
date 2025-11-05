@@ -3,3 +3,5 @@ Flask-SQLAlchemy==3.0.5
 Flask-Login==0.6.3
 Werkzeug==2.3.7
 Bootstrap-Flask==2.3.0
+pandas
+openpyxl
