@@ -4,42 +4,62 @@
 
 {% block extra_css %}
 <style>
-    /* Estilo para a imagem de fundo */
+    /* ======================================================= */
+    /* INÍCIO DA MODIFICAÇÃO (RESPONSIVO)            */
+    /* ======================================================= */
+
+    /* 1. ESTILO PADRÃO (MOBILE-FIRST) */
     body {
-        /* IMAGEM ATUALIZADA CONFORME SOLICITADO */
         background-image: url('https://i.pinimg.com/736x/df/4b/a6/df4ba66c68fe8ad4d1f74ac2e9f4ca58.jpg');
         
-        /* MANTIDO: 'contain' (diminui para caber) conforme solicitação anterior */
-        background-size: contain; 
+        /* 'cover': Cobre a tela inteira (ideal para celular) */
+        background-size: cover; 
         
-        /* 'cover': Cobre a tela inteira (pode cortar a imagem) */
-        /* background-size: cover; */
-        /* 'auto': Tamanho original da imagem */
-        /* background-size: auto; */
-
-
-        /* MANTIDO: 'left center' (alinha à esquerda) conforme solicitação anterior */
-        background-position: left center;
-
-        /* 'center': Centraliza a imagem (Horizontal e Vertical) */
-        /* background-position: center; */
-        /* 'left top': Alinha no canto superior esquerdo */
-        /* background-position: left top; */
-        /* 'right center': Alinha à direita, no meio vertical */
-        /* background-position: right center; */
-
+        /* 'center': Centraliza a imagem (ideal para celular) */
+        background-position: center center;
 
         background-repeat: no-repeat;
         background-attachment: fixed; /* Mantém o fundo fixo ao rolar */
     }
-    
-    /* Faz o card de login ficar levemente transparente */
+
+    /* Em telas de celular, o card de login deve ser mais opaco para legibilidade */
     .card-login {
-        background-color: rgba(255, 255, 255, 0.95);
+        /* Quase opaco para garantir que o formulário seja legível */
+        background-color: rgba(255, 255, 255, 0.98); 
         backdrop-filter: blur(5px);
     }
+    
+    /* 2. AJUSTE PARA TELAS MAIORES (DESKTOP) 
+       Usando 768px (breakpoint 'md' do Bootstrap) 
+    */
+    @media (min-width: 768px) {
+        body {
+            /* Restaura o seu estilo original (imagem à esquerda) para desktop */
+            background-size: contain; 
+            background-position: left center;
+        }
 
-    /* Estilo para as credenciais de teste */
+        /* Em telas de desktop, o card pode ser um pouco mais transparente */
+        .card-login {
+            background-color: rgba(255, 255, 255, 0.95);
+        }
+    }
+    /* ======================================================= */
+    /* FIM DA MODIFICAÇÃO (RESPONSIVO)              */
+    /* ======================================================= */
+
+    /* ======================================================= */
+    /* NOVO ESTILO PARA O LOGO (LOGIN)               */
+    /* ======================================================= */
+    .logo-login {
+        max-width: 250px; /* Largura máxima do logo */
+        margin-bottom: 1rem; /* Espaçamento abaixo do logo */
+        filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.3)); /* Sombra suave */
+    }
+    /* ======================================================= */
+
+
+    /* Estilo para as credenciais de teste (mantido) */
     .credenciais-teste {
         color: white;
         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
@@ -66,9 +86,12 @@
 {% block content_public %}
 <div class="container-fluid min-vh-100 d-flex flex-column align-items-center justify-content-center p-3">
     
+    <div>
+        <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="img-fluid logo-login">
+    </div>
     <div class="row justify-content-center w-100">
         <div class="col-11 col-sm-8 col-md-6 col-lg-4 col-xl-3">
-        <div class="card shadow card-login">
+            <div class="card shadow card-login">
                 <div class="card-header bg-primary text-white text-center">
                     <h4><i class="fas fa-cash-register"></i> Sistema de Caixa</h4>
                     <small>Faça login para continuar</small>

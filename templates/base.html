@@ -59,6 +59,20 @@
         /* FIM - CSS PARA OCULTAR MENU             */
         /* ================================================= */
 
+        /* ================================================= */
+        /* NOVO ESTILO PARA O LOGO (SIDEBAR)        */
+        /* ================================================= */
+        .sidebar-logo-container {
+            padding: 1rem;
+            text-align: center;
+            border-bottom: 1px solid #495057; /* Linha separadora */
+        }
+        .sidebar-logo {
+            max-height: 60px; /* Altura máxima do logo na sidebar */
+            width: auto;
+        }
+        /* ================================================= */
+
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -74,8 +88,11 @@
         <div class="row">
             <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse bg-dark">
                 <div class="position-sticky pt-3">
-                    <h5 class="text-white text-center mb-4">
-                        <i class="fas fa-cash-register"></i> Sistema Caixa
+                    
+                    <div class="sidebar-logo-container">
+                        <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="sidebar-logo">
+                    </div>
+                    <h5 class="text-white text-center mb-4 mt-3"> <i class="fas fa-cash-register"></i> Sistema Caixa
                     </h5>
                     
                     <ul class="nav flex-column">

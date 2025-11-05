@@ -28,6 +28,18 @@
             padding-bottom: 10px;
             margin-bottom: 10px;
         }
+        
+        /* ================================================= */
+        /* NOVO ESTILO PARA O LOGO (CUPOM)          */
+        /* ================================================= */
+        .cupom-logo {
+            max-width: 200px; /* Largura máxima no cupom */
+            max-height: 80px; /* Altura máxima no cupom */
+            margin-bottom: 10px;
+        }
+        /* ================================================= */
+
+
         .cupom-header h5 {
             margin: 0;
             font-weight: bold;
@@ -99,7 +111,9 @@
 
     <div class="cupom">
         <div class="cupom-header">
-            <h5>Paróquia Nossa Senhora das Graças, Pirambu</h5>
+            
+            <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="cupom-logo">
+            <p class="mb-0">Paróquia Nossa Senhora das Graças, Pirambu</p>
             <p class="mb-0">Rua Nossa Senhora das Graças, 255</p>
             <p class="mb-0">CNPJ: 07.210.925/0014-20</p>
             <p class="mb-0 fw-bold">CUPOM NÃO FISCAL</p>
@@ -154,7 +168,7 @@
                     <span>R$ {{ "%.2f"|format(venda.troco) }}</span>
                 </div>
             </div>
-        </div>-----------------------
+        </div>
         
         <div class="cupom-footer">
             <p>Obrigado e volte sempre!</p>
