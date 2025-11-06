@@ -201,7 +201,7 @@ def dashboard():
     # Total de produtos ativos
     total_produtos = Produto.query.filter_by(ativo=True).count()
     
-    # Movimento de caixa atual
+    # Movimento de caixa atual (do admin logado)
     caixa_aberto, movimento_atual = get_caixa_aberto()
     
     # ===========================================================
@@ -219,12 +219,45 @@ def dashboard():
     # FIM DA MODIFICAÇÃO
     # ===========================================================
     
+    # ===========================================================
+    # INÍCIO DA MODIFKAÇÃO: Status de todos os caixas
+    # ===========================================================
+    status_caixas = []
+    # Busca todos os usuários que são 'caixa' OU 'admin' e estão 'ativos'
+    operadores = Usuario.query.filter(
+        Usuario.perfil.in_(['caixa', 'admin']), # <-- MUDANÇA AQUI
+        Usuario.ativo == True
+    ).order_by(Usuario.nome).all()
+
+    for op in operadores:
+        # Busca o último movimento de caixa deste operador
+        ultimo_movimento = MovimentoCaixa.query.filter_by(usuario_id=op.id).order_by(MovimentoCaixa.data_abertura.desc()).first()
+        
+        if ultimo_movimento:
+            status_caixas.append({
+                'nome': op.nome,
+                'status': ultimo_movimento.status, # 'aberto' ou 'fechado'
+                # Define a data relevante (fechamento se fechado, abertura se aberto)
+                'data': ultimo_movimento.data_fechamento if ultimo_movimento.status == 'fechado' else ultimo_movimento.data_abertura
+            })
+        else:
+            # Operador nunca abriu um caixa
+            status_caixas.append({
+                'nome': op.nome,
+                'status': 'nunca_aberto', # Um status para 'Inativo' ou 'Nunca Abriu'
+                'data': None
+            })
+    # ===========================================================
+    # FIM DA MODIFICAÇÃO
+    # ===========================================================
+
     return render_template('dashboard.html',
                          total_hoje=total_hoje,
                          estoque_baixo=estoque_baixo,
                          total_produtos=total_produtos,
                          movimento_atual=movimento_atual,
-                         caixas_esquecidos=caixas_esquecidos) # <- Variável adicionada
+                         caixas_esquecidos=caixas_esquecidos, # <- Variável caixas esquecidos
+                         status_caixas=status_caixas) # <- Variável status de todos os caixas
 
 # =============================================================================
 # ROTAS DO MÓDULO DE CAIXA
