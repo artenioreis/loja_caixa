@@ -86,6 +86,33 @@
     </div>
 </div>
 
+<!-- =========================================================== -->
+<!-- INÍCIO DA MODIFICAÇÃO: Alerta de Caixas Esquecidos           -->
+<!-- =========================================================== -->
+{% if caixas_esquecidos %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="alert alert-danger">
+            <h5 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Atenção: Caixas Não Fechados!</h5>
+            <p>Os seguintes caixas foram abertos em dias anteriores e não foram fechados:</p>
+            <ul class="mb-0">
+                {% for caixa in caixas_esquecidos %}
+                <li>
+                    <strong>Operador:</strong> {{ caixa.usuario.nome }} <br>
+                    <strong>Aberto desde:</strong> {{ caixa.data_abertura.strftime('%d/%m/%Y %H:%M') }} <br>
+                    <strong>Saldo Inicial:</strong> R$ {{ "%.2f"|format(caixa.saldo_inicial) }}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endif %}
+<!-- =========================================================== -->
+<!-- FIM DA MODIFICAÇÃO                                          -->
+<!-- =========================================================== -->
+
+
 <!-- Ações Rápidas -->
 <div class="row">
     <div class="col-md-6">
@@ -121,31 +148,64 @@
         </div>
     </div>
     
+    <!-- =========================================================== -->
+    <!-- INÍCIO DA MODIFICAÇÃO: Card de Status dos Operadores         -->
+    <!-- =========================================================== -->
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h5><i class="fas fa-info-circle"></i> Informações do Sistema</h5>
+                <h5><i class="fas fa-users-cog"></i> Status dos Operadores</h5>
             </div>
             <div class="card-body">
-                <p><strong>Usuário:</strong> {{ current_user.nome }}</p>
-                <p><strong>Perfil:</strong> 
-                    <span class="badge {% if current_user.is_admin() %}bg-primary{% else %}bg-secondary{% endif %}">
-                        {{ current_user.perfil|title }}
-                    </span>
-                </p>
+                <!-- Info do Admin Logado -->
+                <p><strong>Admin Logado:</strong> {{ current_user.nome }}</p> <!-- Texto alterado -->
                 <p><strong>Data/Hora:</strong> {{ now.strftime('%d/%m/%Y %H:%M') }}</p>
                 
-                {% if movimento_atual %}
-                <div class="alert alert-info mt-3">
-                    <small>
-                        <strong>Caixa Aberto:</strong><br>
-                        Desde: {{ movimento_atual.data_abertura.strftime('%d/%m/%Y %H:%M') }}<br>
-                        Saldo Inicial: R$ {{ "%.2f"|format(movimento_atual.saldo_inicial) }}
-                    </small>
-                </div>
-                {% endif %}
+                <!-- REMOVIDO o bloco 'if movimento_atual' -->
+                
+                <hr>
+                <h6><i class="fas fa-cash-register"></i> Monitoramento de Caixas</h6> <!-- Texto alterado -->
+                
+                <!-- NOVA LISTA DE STATUS -->
+                <ul class="list-group">
+                    {% for op_status in status_caixas %}
+                        <!-- Adiciona classe 'active' se for o usuário logado -->
+                        <li class="list-group-item d-flex justify-content-between align-items-center {% if op_status.nome == current_user.nome %}list-group-item-info{% endif %}">
+                            <span>
+                                <i class="fas fa-user"></i> 
+                                <!-- Mostra o nome e se é o usuário atual -->
+                                <strong>{{ op_status.nome }}</strong>
+                                {% if op_status.nome == current_user.nome %} (Você){% endif %}
+                                
+                                <!-- Mostra a data relevante (abertura ou fechamento) -->
+                                {% if op_status.status == 'aberto' %}
+                                    <br><small class="text-muted">Aberto em: {{ op_status.data.strftime('%d/%m %H:%M') }}</sall>
+                                {% elif op_status.status == 'fechado' %}
+                                    <br><small class="text-muted">Fechado em: {{ op_status.data.strftime('%d/%m %H:%M') }}</sall>
+                                {% endif %}
+                            </span>
+                            
+                            <!-- Badge de Status -->
+                            {% if op_status.status == 'aberto' %}
+                                <span class="badge bg-success"><i class="fas fa-lock-open"></i> Aberto</span>
+                            {% elif op_status.status == 'fechado' %}
+                                <span class="badge bg-danger"><i class="fas fa-lock"></i> Fechado</span>
+                            {% else %}
+                                <!-- 'nunca_aberto' -->
+                                <span class="badge bg-secondary">Inativo</span>
+                            {% endif %}
+                        </li>
+                    {% else %}
+                        <li class="list-group-item">Nenhum operador de caixa encontrado.</li>
+                    {% endfor %}
+                </ul>
+                <!-- FIM DA NOVA LISTA -->
+
             </div>
         </div>
     </div>
+    <!-- =========================================================== -->
+    <!-- FIM DA MODIFICAÇÃO                                          -->
+    <!-- =========================================================== -->
 </div>
 {% endblock %}

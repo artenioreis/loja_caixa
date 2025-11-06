@@ -5,17 +5,17 @@
 {% block extra_css %}
 <style>
     /* ======================================================= */
-    /* INÍCIO DA MODIFICAÇÃO (RESPONSIVO)            */
+    /* INÍCIO DA CORREÇÃO (FUNDO SEMPRE PREENCHIDO)  */
     /* ======================================================= */
 
-    /* 1. ESTILO PADRÃO (MOBILE-FIRST) */
+    /* 1. ESTILO PADRÃO (PARA TODAS AS TELAS) */
     body {
         background-image: url('https://wallpapers.com/images/hd/sky-blue-background-klsgg0p0wj4pd0cg.jpg');
         
-        /* 'cover': Cobre a tela inteira (ideal para celular) */
+        /* 'cover': Garante que a imagem cubra a tela inteira */
         background-size: cover; 
         
-        /* 'center': Centraliza a imagem (ideal para celular) */
+        /* 'center': Centraliza a imagem */
         background-position: center center;
 
         background-repeat: no-repeat;
@@ -29,15 +29,12 @@
         backdrop-filter: blur(5px);
     }
     
-    /* 2. AJUSTE PARA TELAS MAIORES (DESKTOP) 
-       Usando 768px (breakpoint 'md' do Bootstrap) 
-    */
+    /* 2. AJUSTE PARA TELAS MAIORES (DESKTOP) */
     @media (min-width: 768px) {
-        body {
-            /* Restaura o seu estilo original (imagem à esquerda) para desktop */
-            background-size: contain; 
-            background-position: left center;
-        }
+        
+        /* As regras do 'body' foram removidas daqui
+           para que 'cover' e 'center' se apliquem sempre.
+        */
 
         /* Em telas de desktop, o card pode ser um pouco mais transparente */
         .card-login {
@@ -45,7 +42,7 @@
         }
     }
     /* ======================================================= */
-    /* FIM DA MODIFICAÇÃO (RESPONSIVO)              */
+    /* FIM DA CORREÇÃO                                */
     /* ======================================================= */
 
     /* ======================================================= */
@@ -129,15 +126,14 @@
                 </div>
             </div>
 
-            #<div class="text-center mt-3 credenciais-teste">
+            {# <div class="text-center mt-3 credenciais-teste">
                 <small>
                     <strong>Credenciais de teste:</strong><br>
                     Admin: admin@loja.com / admin123<br>
                     Caixa: caixa@loja.com / caixa123
                 </small>
-            #</div>
-            
-        </div>
+            </div> #}
+            </div>
     </div>
 </div>
 {% endblock %}

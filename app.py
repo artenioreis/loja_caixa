@@ -2,8 +2,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from database import db
 from models import Usuario, Produto, Venda, ItemVenda, MovimentoCaixa
-# Importações de data/hora atualizadas
-from datetime import datetime, timedelta, date
+# Importações de data/hora atualizadas (adicionado 'time')
+from datetime import datetime, timedelta, date, time
 import os
 # NOVAS IMPORTAÇÕES PARA UPLOAD E NOME DE ARQUIVO SEGURO
 from werkzeug.utils import secure_filename
@@ -204,11 +204,27 @@ def dashboard():
     # Movimento de caixa atual
     caixa_aberto, movimento_atual = get_caixa_aberto()
     
+    # ===========================================================
+    # INÍCIO DA MODIFICAÇÃO: Buscar caixas esquecidos
+    # ===========================================================
+    # Define o início do dia de hoje (meia-noite)
+    hoje_meia_noite = datetime.combine(date.today(), time.min)
+    
+    # Busca caixas que ainda estão 'abertos' E que foram abertos ANTES de hoje
+    caixas_esquecidos = MovimentoCaixa.query.filter(
+        MovimentoCaixa.status == 'aberto',
+        MovimentoCaixa.data_abertura < hoje_meia_noite
+    ).order_by(MovimentoCaixa.data_abertura.desc()).all()
+    # ===========================================================
+    # FIM DA MODIFICAÇÃO
+    # ===========================================================
+    
     return render_template('dashboard.html',
                          total_hoje=total_hoje,
                          estoque_baixo=estoque_baixo,
                          total_produtos=total_produtos,
-                         movimento_atual=movimento_atual)
+                         movimento_atual=movimento_atual,
+                         caixas_esquecidos=caixas_esquecidos) # <- Variável adicionada
 
 # =============================================================================
 # ROTAS DO MÓDULO DE CAIXA
