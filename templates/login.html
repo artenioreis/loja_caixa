@@ -51,16 +51,19 @@
     .logo-login {
         max-width: 250px; /* Largura máxima do logo */
         margin-bottom: 1rem; /* Espaçamento abaixo do logo */
-        filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.3)); /* Sombra suave */
+        filter: drop-shadow(2px 2px 3px rgba(13, 13, 14, 1)); /* Sombra suave */
     }
     /* ======================================================= */
 
-
-    /* Estilo para as credenciais de teste (mantido) */
-    .credenciais-teste {
+    /* ======================================================= */
+    /* AJUSTE: Classe de credenciais removida pois o texto 
+       agora está dentro do card. */
+    /* ======================================================= */
+    /* .credenciais-teste {
         color: white;
         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
-    }
+    } 
+    */
     
     /* CSS PARA DIMINUIR OS INPUTS (MANTIDO) */
     .form-control-sm-custom {
@@ -81,7 +84,7 @@
 {% endblock %}
 
 {% block content_public %}
-<div class="container-fluid min-vh-100 d-flex flex-column align-items-center justify-content-center p-3">
+<div class="container-fluid min-vh-100 d-flex flex-column align-items-center pt-3 p-3">
     
     <div>
         <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="img-fluid logo-login">
@@ -124,15 +127,9 @@
                         </div>
                     </form>
                 </div>
-            </div>
+                
+                </div>
 
-            {# <div class="text-center mt-3 credenciais-teste">
-                <small>
-                    <strong>Credenciais de teste:</strong><br>
-                    Admin: admin@loja.com / admin123<br>
-                    Caixa: caixa@loja.com / caixa123
-                </small>
-            </div> #}
             </div>
     </div>
 </div>
