@@ -220,7 +220,7 @@ def dashboard():
     # ===========================================================
     
     # ===========================================================
-    # INÍCIO DA MODIFKAÇÃO: Status de todos os caixas
+    # INÍCIO DA MODIFICAÇÃO: Status de todos os caixas (COM DIFERENÇA)
     # ===========================================================
     status_caixas = []
     # Busca todos os usuários que são 'caixa' OU 'admin' e estão 'ativos'
@@ -234,18 +234,101 @@ def dashboard():
         ultimo_movimento = MovimentoCaixa.query.filter_by(usuario_id=op.id).order_by(MovimentoCaixa.data_abertura.desc()).first()
         
         if ultimo_movimento:
+            
+            diferenca = 0.0
+            # *** INÍCIO DA CORREÇÃO ***
+            # Definir valores padrão para saldo_esperado e saldo_informado
+            saldo_esperado = 0.0
+            saldo_final_informado = 0.0
+            # *** FIM DA CORREÇÃO ***
+
+            # *** INÍCIO DA MODIFICAÇÃO ***
+            # Adicionamos um sinalizador para controlar a exibição no template
+            mostrar_diferenca = False
+            # *** FIM DA MODIFICAÇÃO ***
+            
+            # Se o último movimento está fechado, calcula a diferença
+            if ultimo_movimento.status == 'fechado':
+                
+                # ===========================================================
+                #           INÍCIO DA CORREÇÃO DO BUG (RACE CONDITION)
+                # ===========================================================
+                #
+                # A consulta no 'dashboard' estava usando um filtro de data de 
+                # fechamento (<= data_fechamento) que a rota 'fechar_caixa' 
+                # não usa. Isso causava a inconsistência que você viu.
+                #
+                # Se uma venda fosse salva milissegundos DEPOIS da data de
+                # fechamento, a rota 'fechar_caixa' a via, mas o 'dashboard'
+                # não, resultando em 'Total Esperado: 0.00'.
+                #
+                # REMOVEMOS A LINHA DE FILTRO DE DATA DE FECHAMENTO
+                # para que esta consulta seja IDÊNTICA à da rota 'fechar_caixa'.
+                
+                vendas_periodo = Venda.query.filter(
+                    Venda.data_venda >= ultimo_movimento.data_abertura,
+                    # LINHA REMOVIDA (CAUSADORA DO BUG):
+                    # Venda.data_venda <= ultimo_movimento.data_fechamento,
+                    Venda.usuario_id == op.id,
+                    Venda.status == 'finalizada'
+                ).all()
+                
+                # ===========================================================
+                #            FIM DA CORREÇÃO DO BUG
+                # ===========================================================
+                
+                total_vendas = sum(venda.valor_total for venda in vendas_periodo)
+                
+                # Calcula o saldo esperado
+                saldo_esperado = (ultimo_movimento.saldo_inicial or 0) + total_vendas
+                
+                # Pega o saldo que foi informado no fechamento
+                saldo_final_informado = ultimo_movimento.saldo_final or 0
+                
+                # Calcula a diferença
+                diferenca = saldo_final_informado - saldo_esperado
+
+                # *** INÍCIO DA MODIFICAÇÃO ***
+                # Verifica se a diferença é (praticamente) zero.
+                # Usamos abs() e um valor pequeno para segurança com floats.
+                if abs(diferenca) > 0.001:
+                    mostrar_diferenca = True
+                # *** FIM DA MODIFICAÇÃO ***
+            
             status_caixas.append({
                 'nome': op.nome,
                 'status': ultimo_movimento.status, # 'aberto' ou 'fechado'
                 # Define a data relevante (fechamento se fechado, abertura se aberto)
-                'data': ultimo_movimento.data_fechamento if ultimo_movimento.status == 'fechado' else ultimo_movimento.data_abertura
+                'data': ultimo_movimento.data_fechamento if ultimo_movimento.status == 'fechado' else ultimo_movimento.data_abertura,
+                'diferenca': diferenca,  # Adiciona a diferença ao dicionário
+                # *** INÍCIO DA CORREÇÃO ***
+                # Adicionar as chaves que faltavam
+                'saldo_esperado': saldo_esperado,
+                'saldo_informado': saldo_final_informado,
+                # *** FIM DA CORREÇÃO ***
+                
+                # *** INÍCIO DA MODIFICAÇÃO ***
+                # Passa o sinalizador para o template
+                'mostrar_diferenca': mostrar_diferenca
+                # *** FIM DA MODIFICAÇÃO ***
             })
         else:
             # Operador nunca abriu um caixa
             status_caixas.append({
                 'nome': op.nome,
                 'status': 'nunca_aberto', # Um status para 'Inativo' ou 'Nunca Abriu'
-                'data': None
+                'data': None,
+                'diferenca': 0.0,  # Adiciona a diferença (padrão 0)
+                # *** INÍCIO DA CORREÇÃO ***
+                # Adicionar chaves padrão para consistência
+                'saldo_esperado': 0.0,
+                'saldo_informado': 0.0,
+                # *** FIM DA CORREÇÃO ***
+
+                # *** INÍCIO DA MODIFICAÇÃO ***
+                # Define o sinalizador como falso
+                'mostrar_diferenca': False
+                # *** FIM DA MODIFICAÇÃO ***
             })
     # ===========================================================
     # FIM DA MODIFICAÇÃO
@@ -294,6 +377,7 @@ def abrir_caixa():
     
     return render_template('abrir_caixa.html')
 
+
 @app.route('/caixa/fechar', methods=['GET', 'POST'])
 @login_required
 def fechar_caixa():
@@ -310,20 +394,30 @@ def fechar_caixa():
         else:
             return redirect(url_for('vendas'))
     
+    # --- LÓGICA DO MÉTODO POST (Onde o fechamento ocorre) ---
     if request.method == 'POST':
         saldo_final = float(request.form.get('saldo_final', 0))
         
-        # Calcula total de vendas do período
+        # *** INÍCIO DA CORREÇÃO DE CONSISTÊNCIA ***
+        # 1. Define o momento exato do fechamento UMA VEZ
+        momento_fechamento = datetime.now()
+        
+        # 2. Calcula total de vendas do período ATÉ O MOMENTO DO FECHAMENTO
+        #    (Esta consulta agora é consistente com a do dashboard)
         vendas_periodo = Venda.query.filter(
             Venda.data_venda >= movimento_atual.data_abertura,
+            # Adicionamos este filtro para garantir que vendas 
+            # futuras (após o clique) não entrem.
+            Venda.data_venda <= momento_fechamento, 
             Venda.usuario_id == current_user.id, # Apenas vendas deste usuário
             Venda.status == 'finalizada'
         ).all()
+        # *** FIM DA CORREÇÃO DE CONSISTÊNCIA ***
         
         total_vendas = sum(venda.valor_total for venda in vendas_periodo)
         
         # Atualiza movimento de caixa
-        movimento_atual.data_fechamento = datetime.now()
+        movimento_atual.data_fechamento = momento_fechamento # <-- Usa o mesmo momento
         movimento_atual.saldo_final = saldo_final
         movimento_atual.status = 'fechado'
         
@@ -335,7 +429,9 @@ def fechar_caixa():
         else:
             return redirect(url_for('vendas'))
     
+    # --- LÓGICA DO MÉTODO GET (Apenas para exibir a tela) ---
     # Calcula estatísticas para exibir no fechamento
+    # (Esta consulta está OK, pois é em tempo real)
     vendas_periodo = Venda.query.filter(
         Venda.data_venda >= movimento_atual.data_abertura,
         Venda.usuario_id == current_user.id, # Apenas vendas deste usuário
@@ -349,6 +445,7 @@ def fechar_caixa():
                          caixa_aberto=movimento_atual,
                          total_vendas=total_vendas,
                          total_vendas_count=total_vendas_count)
+
 
 # =============================================================================
 # ROTAS DO MENU (ADMIN E PDV)

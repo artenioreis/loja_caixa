@@ -3,179 +3,222 @@
 {% block title %}Dashboard - Sistema de Caixa{% endblock %}
 
 {% block content %}
+
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <span class="badge {% if caixa_aberto %}bg-success{% else %}bg-danger{% endif %} fs-6">
-            <i class="fas {% if caixa_aberto %}fa-lock-open{% else %}fa-lock{% endif %}"></i>
-            Caixa {% if caixa_aberto %}Aberto{% else %}Fechado{% endif %}
-        </span>
-    </div>
+<h1 class="h2"><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+<div class="btn-toolbar mb-2 mb-md-0">
+<span class="badge {% if caixa_aberto %}bg-success{% else %}bg-danger{% endif %} fs-6">
+<i class="fas {% if caixa_aberto %}fa-lock-open{% else %}fa-lock{% endif %}"></i>
+Caixa {% if caixa_aberto %}Aberto{% else %}Fechado{% endif %}
+</span>
+</div>
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-3 mb-3">
-        <div class="card stats-card bg-primary text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Vendas Hoje</h5>
-                        <h2 class="card-text">R$ {{ "%.2f"|format(total_hoje) }}</h2>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-shopping-cart fa-2x"></i>
-                    </div>
+<div class="col-md-3 mb-3">
+<div class="card stats-card bg-primary text-white">
+<div class="card-body">
+<div class="d-flex justify-content-between">
+<div>
+<h5 class="card-title">Vendas Hoje</h5>
+<h2 class="card-text">R$ {{ "%.2f"|format(total_hoje) }}</h2>
+</div>
+<div class="align-self-center">
+<i class="fas fa-shopping-cart fa-2x"></i>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="col-md-3 mb-3">
+    <div class="card stats-card bg-success text-white">
+        <div class="card-body">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h5 class="card-title">Produtos</h5>
+                    <h2 class="card-text">{{ total_produtos }}</h2>
                 </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 mb-3">
-        <div class="card stats-card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Produtos</h5>
-                        <h2 class="card-text">{{ total_produtos }}</h2>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-boxes fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 mb-3">
-        <div class="card stats-card bg-warning text-dark">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Estoque Baixo</h5>
-                        <h2 class="card-text">{{ estoque_baixo }}</h2>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-exclamation-triangle fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 mb-3">
-        <div class="card stats-card bg-info text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Status Caixa</h5>
-                        <h6 class="card-text">
-                            {% if caixa_aberto %}
-                                <span class="badge bg-success">Aberto</span>
-                            {% else %}
-                                <span class="badge bg-danger">Fechado</span>
-                            {% endif %}
-                        </h6>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-cash-register fa-2x"></i>
-                    </div>
+                <div class="align-self-center">
+                    <i class="fas fa-boxes fa-2x"></i>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-{% if caixas_esquecidos %}
-<div class="row">
-    <div class="col-md-12">
-        <div class="alert alert-danger">
-            <h5 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Atenção: Caixas Não Fechados!</h5>
-            <p>Os seguintes caixas foram abertos em dias anteriores e não foram fechados:</p>
-            <ul class="mb-0">
-                {% for caixa in caixas_esquecidos %}
-                <li>
-                    <strong>Operador:</strong> {{ caixa.usuario.nome }} <br>
-                    <strong>Aberto desde:</strong> {{ caixa.data_abertura.strftime('%d/%m/%Y %H:%M') }} <br>
-                    <strong>Saldo Inicial:</strong> R$ {{ "%.2f"|format(caixa.saldo_inicial) }}
-                </li>
-                {% endfor %}
-            </ul>
+<div class="col-md-3 mb-3">
+    <div class="card stats-card bg-warning text-dark">
+        <div class="card-body">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h5 class="card-title">Estoque Baixo</h5>
+                    <h2 class="card-text">{{ estoque_baixo }}</h2>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-exclamation-triangle fa-2x"></i>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<div class="col-md-3 mb-3">
+    <div class="card stats-card bg-info text-white">
+        <div class="card-body">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h5 class="card-title">Status Caixa</h5>
+                    <h6 class="card-text">
+                        {% if caixa_aberto %}
+                            <span class="badge bg-success">Aberto</span>
+                        {% else %}
+                            <span class="badge bg-danger">Fechado</span>
+                        {% endif %}
+                    </h6>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-cash-register fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+</div>
+
+{% if caixas_esquecidos %}
+
+<div class="row">
+<div class="col-md-12">
+<div class="alert alert-danger">
+<h5 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Atenção: Caixas Não Fechados!</h5>
+<p>Os seguintes caixas foram abertos em dias anteriores e não foram fechados:</p>
+<ul class="mb-0">
+{% for caixa in caixas_esquecidos %}
+<li>
+<strong>Operador:</strong> {{ caixa.usuario.nome }} 
+
+
+
+
+<strong>Aberto desde:</strong> {{ caixa.data_abertura.strftime('%d/%m/%Y %H:%M') }} 
+
+
+
+
+<strong>Saldo Inicial:</strong> R$ {{ "%.2f"|format(caixa.saldo_inicial) }}
+</li>
+{% endfor %}
+</ul>
+</div>
+</div>
+</div>
 {% endif %}
 <div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-rocket"></i> Ações Rápidas</h5>
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    {% if caixa_aberto %}
-                    <a href="{{ url_for('vendas') }}" class="btn btn-success btn-lg">
-                        <i class="fas fa-cash-register"></i> Nova Venda
-                    </a>
-                    <a href="{{ url_for('fechar_caixa') }}" class="btn btn-warning">
-                        <i class="fas fa-lock"></i> Fechar Caixa
-                    </a>
-                    {% else %}
-                    <a href="{{ url_for('abrir_caixa') }}" class="btn btn-primary btn-lg">
-                        <i class="fas fa-lock-open"></i> Abrir Caixa
-                    </a>
-                    {% endif %}
-                    
-                    {% if current_user.is_admin() %}
-                    <a href="{{ url_for('produtos') }}" class="btn btn-outline-primary">
-                        <i class="fas fa-boxes"></i> Gerenciar Produtos
-                    </a>
-                    <a href="{{ url_for('relatorios') }}" class="btn btn-outline-info">
-                        <i class="fas fa-chart-bar"></i> Ver Relatórios
-                    </a>
-                    {% endif %}
-                </div>
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h5><i class="fas fa-rocket"></i> Ações Rápidas</h5>
+</div>
+<div class="card-body">
+<div class="d-grid gap-2">
+{% if caixa_aberto %}
+<a href="{{ url_for('vendas') }}" class="btn btn-success btn-lg">
+<i class="fas fa-cash-register"></i> Nova Venda
+</a>
+<a href="{{ url_for('fechar_caixa') }}" class="btn btn-warning">
+<i class="fas fa-lock"></i> Fechar Caixa
+</a>
+{% else %}
+<a href="{{ url_for('abrir_caixa') }}" class="btn btn-primary btn-lg">
+<i class="fas fa-lock-open"></i> Abrir Caixa
+</a>
+{% endif %}
+
+                {% if current_user.is_admin() %}
+                <a href="{{ url_for('produtos') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-boxes"></i> Gerenciar Produtos
+                </a>
+                <a href="{{ url_for('relatorios') }}" class="btn btn-outline-info">
+                    <i class="fas fa-chart-bar"></i> Ver Relatórios
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
-    
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-users-cog"></i> Status dos Operadores</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>Admin Logado:</strong> {{ current_user.nome }}</p> <p><strong>Data/Hora:</strong> {{ now.strftime('%d/%m/%Y %H:%M') }}</p>
-                
-                <hr>
-                <h6><i class="fas fa-cash-register"></i> Monitoramento de Caixas</h6> <ul class="list-group">
-                    {% for op_status in status_caixas %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center {% if op_status.nome == current_user.nome %}list-group-item-info{% endif %}">
-                            <span>
-                                <i class="fas fa-user"></i> 
-                                <strong>{{ op_status.nome }}</strong>
-                                {% if op_status.nome == current_user.nome %} (Você){% endif %}
-                                
-                                {% if op_status.status == 'aberto' %}
-                                    <br><span class="text-muted">Aberto em: {{ op_status.data.strftime('%d/%m %H:%M') }}</span>
-                                {% elif op_status.status == 'fechado' %}
-                                    <br><span class="text-muted">Fechado em: {{ op_status.data.strftime('%d/%m %H:%M') }}</span>
-                                {% endif %}
-                                </span>
+</div>
+
+<div class="col-md-6">
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="fas fa-users-cog"></i> Status dos Operadores</h5>
+        </div>
+        <div class="card-body">
+            <p><strong>Admin Logado:</strong> {{ current_user.nome }}</p> <p><strong>Data/Hora:</strong> {{ now.strftime('%d/%m/%Y %H:%M') }}</p>
+            
+            <hr>
+            <h6><i class="fas fa-cash-register"></i> Monitoramento de Caixas</h6> 
+            <ul class="list-group">
+                {% for op_status in status_caixas %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center {% if op_status.nome == current_user.nome %}list-group-item-info{% endif %}">
+                        <span>
+                            <i class="fas fa-user"></i> 
+                            <strong>{{ op_status.nome }}</strong>
+                            {% if op_status.nome == current_user.nome %} (Você){% endif %}
                             
                             {% if op_status.status == 'aberto' %}
+                                <br><span class="text-muted">Aberto em: {{ op_status.data.strftime('%d/%m %H:%M') }}</span>
+                            {% elif op_status.status == 'fechado' %}
+                                <br><span class="text-muted">Fechado em: {{ op_status.data.strftime('%d/%m %H:%M') }}</span>
+                            {% endif %}
+                        </span>
+                        
+                        <div class="text-end">
+                            {% if op_status.status == 'aberto' %}
                                 <span class="badge bg-success"><i class="fas fa-lock-open"></i> Aberto</span>
+                            
                             {% elif op_status.status == 'fechado' %}
                                 <span class="badge bg-danger"><i class="fas fa-lock"></i> Fechado</span>
-                            {% else %}
+                                
+                                {# A lógica agora usa o sinalizador 'mostrar_diferenca' vindo do app.py #}
+                                {% if op_status.mostrar_diferenca %}
+                                    <br>
+                                    
+                                    {# Define a cor com base na diferença #}
+                                    {% if op_status.diferenca < 0 %}
+                                        {% set cor_badge = 'bg-danger' %} {# Falta = Vermelho #}
+                                    {% else %}
+                                        {% set cor_badge = 'bg-warning text-dark' %} {# Sobra = Amarelo #}
+                                    {% endif %}
+                                    
+                                    <div class="badge {{ cor_badge }} text-start mt-1" style="font-size: 0.8rem; line-height: 1.3; white-space: normal;">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        
+                                        <span>Total Esperado: R$ {{ "%.2f"|format(op_status.saldo_esperado) }}</span><br>
+                                        <span>Total Informado: R$ {{ "%.2f"|format(op_status.saldo_informado) }}</span><br>
+                                        
+                                        {% if op_status.diferenca < 0 %}
+                                            <span style="font-weight: bold;">FALTA: R$ {{ "%.2f"|format(op_status.diferenca|abs) }}</span>
+                                        {% else %}
+                                            <span style="font-weight: bold;">SOBRA: R$ +{{ "%.2f"|format(op_status.diferenca) }}</span>
+                                        {% endif %}
+                                        </div>
+                                {% endif %}
+                                {% else %}
                                 <span class="badge bg-secondary">Inativo</span>
                             {% endif %}
-                        </li>
-                    {% else %}
-                        <li class="list-group-item">Nenhum operador de caixa encontrado.</li>
-                    {% endfor %}
-                </ul>
-                </div>
-        </div>
+                        </div>
+                    </li>
+                {% else %}
+                    <li class="list-group-item">Nenhum operador de caixa encontrado.</li>
+                {% endfor %}
+            </ul>
+            </div>
     </div>
-    </div>
+</div>
+
+
+</div>
 {% endblock %}
