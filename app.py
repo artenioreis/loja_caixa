@@ -7,6 +7,10 @@ from datetime import datetime, timedelta, date, time
 import os
 # NOVAS IMPORTAÇÕES PARA UPLOAD E NOME DE ARQUIVO SEGURO
 from werkzeug.utils import secure_filename
+# =======================================================
+# IMPORTAÇÃO ADICIONADA PARA BUSCA (or_)
+# =======================================================
+from sqlalchemy import or_
 
 # =======================================================
 #               INÍCIO DAS NOVAS IMPORTAÇÕES (EXCEL)
@@ -1041,6 +1045,59 @@ def api_buscar_produto(codigo):
         'estoque_atual': produto.estoque_atual,
         'imagem_url': imagem_path
     })
+
+# =============================================================================
+#           INÍCIO DA NOVA ROTA (BUSCAR PRODUTO POR NOME)
+# =============================================================================
+@app.route('/api/produtos/buscar')
+@login_required
+def api_buscar_produto_por_nome():
+    """
+    API para buscar produtos pelo nome (ou código de barras)
+    Usado pelo modal de busca (F2).
+    """
+    # Verifica se o caixa está aberto
+    caixa_aberto, _ = get_caixa_aberto()
+    if not caixa_aberto:
+        return jsonify({'error': 'Caixa está fechado!'}), 403
+    
+    termo_busca = request.args.get('nome', '')
+
+    # Se o termo for muito curto, não retorna nada
+    if len(termo_busca) < 2:
+        return jsonify([]) # Retorna uma lista vazia
+
+    # Busca produtos ativos onde o nome OU o código de barras
+    # contenham o termo de busca (case-insensitive)
+    produtos = Produto.query.filter(
+        or_(
+            Produto.nome.ilike(f'%{termo_busca}%'),
+            Produto.codigo_barras.ilike(f'%{termo_busca}%')
+        ),
+        Produto.ativo == True
+    ).order_by(Produto.nome).limit(20).all() # Limita a 20 resultados
+
+    resultados = []
+    for produto in produtos:
+        # Gera a URL da imagem se ela existir
+        imagem_path = None
+        if produto.imagem_url:
+            imagem_path = url_for('static', filename=produto.imagem_url.replace('static/', '', 1))
+            
+        resultados.append({
+            'id': produto.id,
+            'nome': produto.nome,
+            'codigo_barras': produto.codigo_barras, # Importante para a seleção
+            'preco_venda': produto.preco_venda,
+            'estoque_atual': produto.estoque_atual,
+            'imagem_url': imagem_path
+        })
+
+    return jsonify(resultados)
+# =============================================================================
+#           FIM DA NOVA ROTA
+# =============================================================================
+
 
 @app.route('/vendas/finalizar', methods=['POST'])
 @login_required

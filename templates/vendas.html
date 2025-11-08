@@ -28,6 +28,49 @@
         object-fit: contain;
         margin-bottom: 10px;
     }
+
+    /* ======================================================= */
+    /* INÍCIO DO NOVO CSS (MODAL DE BUSCA)           */
+    /* ======================================================= */
+    #lista-resultados-busca {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    /* Estilo para o item da lista de busca */
+    .resultado-item-busca img {
+        width: 50px;
+        height: 50px;
+        object-fit: cover;
+        margin-right: 15px;
+        border-radius: 5px;
+    }
+    
+    .resultado-item-busca .info {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    
+    .resultado-item-busca .info .nome {
+        font-weight: bold;
+        color: #0d6efd; /* Azul do Bootstrap */
+    }
+    
+    .resultado-item-busca .info .detalhes {
+        font-size: 0.85rem;
+        color: #6c757d; /* Cinza do Bootstrap */
+    }
+    
+    .resultado-item-busca .preco {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #198754; /* Verde do Bootstrap */
+        white-space: nowrap; /* Impede que o preço quebre a linha */
+    }
+    /* ======================================================= */
+    /* FIM DO NOVO CSS (MODAL DE BUSCA)            */
+    /* ======================================================= */
 </style>
 {% endblock %}
 
@@ -76,6 +119,13 @@
             <div class="card-body">
                 <h6 class="card-title">Atalhos</h6>
                 <p><kbd>Enter</kbd> - Adicionar Item</p>
+                <!-- ======================================================= -->
+                <!--           INÍCIO DA ALTERAÇÃO (NOVO ATALHO)           -->
+                <!-- ======================================================= -->
+                <p><kbd>F2</kbd> - Buscar Produto por Nome</p>
+                <!-- ======================================================= -->
+                <!--             FIM DA ALTERAÇÃO (NOVO ATALHO)            -->
+                <!-- ======================================================= -->
                 <p><kbd>F6</kbd> - Finalizar Venda</p>
                 <p><kbd>F3</kbd> - Cancelar Venda</p>
             </div>
@@ -101,7 +151,8 @@
                             </tr>
                         </thead>
                         <tbody id="carrinho-tbody">
-                            </tbody>
+                            <!-- Itens do carrinho são inseridos aqui via JS -->
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -127,12 +178,42 @@
     </div>
 </div>
 
+<!-- ======================================================= -->
+<!--           INÍCIO DO NOVO HTML (MODAL DE BUSCA)          -->
+<!-- ======================================================= -->
+<div class="modal fade" id="modalBuscarProduto" tabindex="-1" aria-labelledby="modalBuscarProdutoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalBuscarProdutoLabel"><i class="fas fa-search"></i> Buscar Produto por Nome</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="input-busca-nome" class="form-label">Digite o nome ou código do produto:</label>
+                    <input type="text" class="form-control form-control-lg" id="input-busca-nome" placeholder="Ex: Arroz ou 789...">
+                </div>
+                <hr>
+                <div id="lista-resultados-busca">
+                    <p class="text-center text-muted">Aguardando digitação (mín. 2 caracteres)...</p>
+                    <!-- Os resultados da busca serão inseridos aqui pelo JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ======================================================= -->
+<!--             FIM DO NOVO HTML (MODAL DE BUSCA)           -->
+<!-- ======================================================= -->
+
+
+<!-- Modal Finalizar (Existente) -->
 <div class="modal fade" id="modalFinalizar" tabindex="-1" aria-labelledby="modalFinalizarLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title" id="modalFinalizarLabel"><i class="fas fa-check"></i> Finalizar Venda</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="row">
@@ -162,7 +243,7 @@
                                  class="img-fluid rounded border" 
                                  style="max-width: 250px;">
                         </div>
-                        </div>
+                    </div>
                     
                     <div class="col-md-6 bg-light p-4 rounded">
                         <h3>Total a Pagar:</h3>
@@ -207,8 +288,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnFinalizar = document.getElementById('btn-finalizar');
     const btnCancelar = document.getElementById('btn-cancelar');
     
-    // --- Modal ---
-    const modal = new bootstrap.Modal(document.getElementById('modalFinalizar'));
+    // --- Modal Finalizar (Existente) ---
+    const modalFinalizarVenda = new bootstrap.Modal(document.getElementById('modalFinalizar'));
     const modalTotalVenda = document.getElementById('modal-total-venda');
     const modalTroco = document.getElementById('modal-troco');
     const selectFormaPagamento = document.getElementById('forma_pagamento');
@@ -216,9 +297,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const campoValorPago = document.getElementById('campo-valor-pago');
     const btnConfirmarVenda = document.getElementById('btn-confirmar-venda');
     
-    // --- Novos Elementos PIX ---
+    // --- Elementos PIX (Existente) ---
     const campoPixQrcode = document.getElementById('campo-pix-qrcode');
     const modalTotalPix = document.getElementById('modal-total-pix');
+
+    // =========================================================================
+    //           INÍCIO DOS NOVOS ELEMENTOS (MODAL DE BUSCA)
+    // =========================================================================
+    const modalBusca = new bootstrap.Modal(document.getElementById('modalBuscarProduto'));
+    const inputBuscaNome = document.getElementById('input-busca-nome');
+    const listaResultadosBusca = document.getElementById('lista-resultados-busca');
+    let buscaTypingTimer; // Timer para o debounce da busca por nome
+    // =========================================================================
+    //             FIM DOS NOVOS ELEMENTOS
+    // =========================================================================
 
     // =========================================================================
     // FUNÇÕES PRINCIPAIS
@@ -396,15 +488,12 @@ document.addEventListener('DOMContentLoaded', function() {
         let troco = 0;
         
         // Atualiza o valor total no modal (para ambos os lados)
+        modalTotalVenda.textContent = `R$ ${totalVenda.toFixed(2)}`; // ATUALIZADO
         modalTotalPix.textContent = totalVenda.toFixed(2);
         
         // Esconde ambos os campos dinâmicos por padrão
         campoValorPago.style.display = 'none';
         campoPixQrcode.style.display = 'none';
-        
-        // =======================================================
-        //               INÍCIO DA CORREÇÃO (TYPO)
-        // =======================================================
         
         // Verifica a forma de pagamento selecionada
         if (selectFormaPagamento.value === 'dinheiro') {
@@ -413,16 +502,11 @@ document.addEventListener('DOMContentLoaded', function() {
                  troco = valorPago - totalVenda;
             }
         
-        // CORRIGIDO: Era selectFormaPagamVento.value
         } else if (selectFormaPagamento.value === 'pix') {
             campoPixQrcode.style.display = 'block'; // Mostra campo "QR Code"
             // Se for PIX, o valor pago é o total da venda e não há troco
             inputValorPago.value = totalVenda.toFixed(2);
             troco = 0;
-        
-        // =======================================================
-        //                FIM DA CORREÇÃO (TYPO)
-        // =======================================================
         
         } else {
             // 'cartao' ou outro
@@ -481,17 +565,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const result = await response.json();
             
-            // =======================================================
-            // MODIFICAÇÃO AQUI: Abrir o cupom em nova janela
-            // =======================================================
+            // Abrir o cupom em nova janela
             window.open('/venda/cupom/' + result.venda_id, '_blank', 'width=500,height=700');
-            // =======================================================
             
             // Limpa tudo
             carrinho = [];
             renderizarCarrinho();
             limparFormularioProduto();
-            modal.hide();
+            modalFinalizarVenda.hide(); // CORRIGIDO
 
         } catch (error) {
             console.error('Erro ao finalizar venda:', error);
@@ -501,6 +582,124 @@ document.addEventListener('DOMContentLoaded', function() {
             btnConfirmarVenda.innerHTML = '<i class="fas fa-save"></i> Confirmar Venda';
         }
     }
+
+    
+    // =========================================================================
+    //           INÍCIO DAS NOVAS FUNÇÕES (BUSCA POR NOME)
+    // =========================================================================
+
+    /**
+     * Busca produtos por nome na nova API
+     */
+    async function buscarProdutoPorNome() {
+        const termo = inputBuscaNome.value;
+
+        if (termo.length < 2) {
+            listaResultadosBusca.innerHTML = '<p class="text-center text-muted">Aguardando digitação (mín. 2 caracteres)...</p>';
+            return;
+        }
+
+        listaResultadosBusca.innerHTML = '<p class="text-center text-primary"><i class="fas fa-spinner fa-spin"></i> Buscando...</p>';
+
+        try {
+            // Chama a nova API criada no app.py
+            const response = await fetch(`/api/produtos/buscar?nome=${termo}`);
+            if (!response.ok) {
+                throw new Error('Erro ao buscar produtos');
+            }
+            const produtos = await response.json();
+            renderizarResultadosBusca(produtos);
+        } catch (error) {
+            console.error('Erro na busca por nome:', error);
+            listaResultadosBusca.innerHTML = '<p class="text-center text-danger">Erro ao buscar produtos.</p>';
+        }
+    }
+
+    /**
+     * Renderiza os resultados da busca por nome no modal
+     */
+    function renderizarResultadosBusca(produtos) {
+        listaResultadosBusca.innerHTML = ''; // Limpa a lista
+
+        if (produtos.length === 0) {
+            listaResultadosBusca.innerHTML = '<p class="text-center text-warning">Nenhum produto encontrado.</p>';
+            return;
+        }
+
+        const ul = document.createElement('ul');
+        ul.className = 'list-group';
+
+        produtos.forEach(produto => {
+            const li = document.createElement('a'); // Usamos <a> para ser clicável
+            li.href = "#";
+            li.className = 'list-group-item list-group-item-action resultado-item-busca d-flex justify-content-between align-items-center';
+            
+            // Armazena todos os dados do produto no próprio elemento
+            li.dataset.produtoJson = JSON.stringify(produto);
+            
+            // Imagem (ou ícone)
+            const imgHtml = produto.imagem_url
+                ? `<img src="${produto.imagem_url}" alt="${produto.nome}">`
+                : `<div class="d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; background: #eee; margin-right: 15px; border-radius: 5px;"><i class="fas fa-image text-muted"></i></div>`;
+
+            // Informações (Nome, Estoque)
+            const infoHtml = `
+                <div class="info">
+                    <span class="nome">${produto.nome}</span>
+                    <span class="detalhes">Cód: ${produto.codigo_barras} | Estoque: ${produto.estoque_atual}</span>
+                </div>
+            `;
+            
+            // Preço
+            const precoHtml = `<span class="preco">R$ ${produto.preco_venda.toFixed(2)}</span>`;
+
+            li.innerHTML = `
+                <div class="d-flex align-items-center">
+                    ${imgHtml}
+                    ${infoHtml}
+                </div>
+                ${precoHtml}
+            `;
+            
+            // Adiciona o evento de clique
+            li.addEventListener('click', selecionarProdutoDaBusca);
+            
+            ul.appendChild(li);
+        });
+        
+        listaResultadosBusca.appendChild(ul);
+    }
+
+    /**
+     * Ação ao clicar em um item da lista de busca
+     */
+    function selecionarProdutoDaBusca(e) {
+        e.preventDefault();
+        
+        // Pega os dados do produto que armazenamos no 'dataset'
+        const produto = JSON.parse(e.currentTarget.dataset.produtoJson);
+
+        // 1. Define o 'produtoAtual' (variável global)
+        // A função adicionarAoCarrinho usa 'produtoAtual'
+        produtoAtual = {
+            id: produto.id,
+            nome: produto.nome,
+            preco_venda: produto.preco_venda
+            // os outros campos não são necessários para adicionarAoCarrinho
+        };
+        
+        // 2. Chama a função de adicionar ao carrinho
+        // O input 'quantidade' (que está fora do modal) será usado (padrão 1)
+        adicionarAoCarrinho();
+        
+        // 3. Fecha o modal
+        modalBusca.hide();
+    }
+    
+    // =========================================================================
+    //           FIM DAS NOVAS FUNÇÕES
+    // =========================================================================
+
 
     // =========================================================================
     // EVENT LISTENERS
@@ -522,7 +721,7 @@ document.addEventListener('DOMContentLoaded', function() {
              // Caso contrário, espera o usuário parar de digitar
              typingTimer = setTimeout(() => {
                 buscarProduto(false); 
-             }, 500);
+             }, 500); // 500ms delay
         }
     });
     
@@ -533,7 +732,7 @@ document.addEventListener('DOMContentLoaded', function() {
     inputQuantidade.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            adicionarAoVenda();
+            adicionarAoCarrinho(); // CORRIGIDO (era adicionarAoVenda)
         }
     });
     
@@ -545,13 +744,23 @@ document.addEventListener('DOMContentLoaded', function() {
     selectFormaPagamento.addEventListener('change', atualizarModalPagamento);
     inputValorPago.addEventListener('input', atualizarModalPagamento);
     
-    // Atalhos do teclado
+    // Atalhos do teclado (MODIFICADO)
     document.addEventListener('keydown', (e) => {
+        
+        // ======================================================= //
+        //           INÍCIO DA NOVA LÓGICA (F2)                    //
+        // ======================================================= //
+        if (e.key === 'F2') {
+            e.preventDefault();
+            modalBusca.show();
+        }
+        // ======================================================= //
+        
         if (e.key === 'F6') {
             e.preventDefault();
             if(carrinho.length > 0) {
                 atualizarModalPagamento(); 
-                modal.show();
+                modalFinalizarVenda.show(); // CORRIGIDO (era modal.show())
             }
         }
         if (e.key === 'F3') {
@@ -559,6 +768,38 @@ document.addEventListener('DOMContentLoaded', function() {
             cancelarVenda();
         }
     });
+
+    // =========================================================================
+    //           INÍCIO DOS NOVOS LISTENERS (MODAL DE BUSCA)
+    // =========================================================================
+    
+    // Foca o input de busca quando o modal abrir
+    document.getElementById('modalBuscarProduto').addEventListener('shown.bs.modal', function () {
+        inputBuscaNome.focus();
+        inputBuscaNome.select();
+    });
+    
+    // Limpa o input de busca quando o modal fechar
+    document.getElementById('modalBuscarProduto').addEventListener('hidden.bs.modal', function () {
+        inputBuscaNome.value = '';
+        listaResultadosBusca.innerHTML = '<p class="text-center text-muted">Aguardando digitação (mín. 2 caracteres)...</p>';
+    });
+
+    // Evento de digitação no input de busca (com debounce)
+    inputBuscaNome.addEventListener('keyup', (e) => {
+        clearTimeout(buscaTypingTimer);
+        
+        // Se o usuário pressionar Enter na busca, não faz nada (ele deve clicar)
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            return;
+        }
+        
+        buscaTypingTimer = setTimeout(buscarProdutoPorNome, 300); // 300ms de espera
+    });
+    // =========================================================================
+    //           FIM DOS NOVOS LISTENERS
+    // =========================================================================
 
     // Inicializa a tela
     renderizarCarrinho();
