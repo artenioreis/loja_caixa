@@ -11,16 +11,20 @@
             </div>
             <div class="card-body">
                 <form method="POST">
-                    <!-- Resumo do Período -->
+                    <!-- Resumo do Período (MODIFICADO) -->
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <div class="card bg-light">
                                 <div class="card-body">
                                     <h6>Resumo do Período</h6>
                                     <p><strong>Data Abertura:</strong> {{ caixa_aberto.data_abertura.strftime('%d/%m/%Y %H:%M') }}</p>
-                                    <p><strong>Saldo Inicial:</strong> R$ {{ "%.2f"|format(caixa_aberto.saldo_inicial) }}</p>
-                                    <p><strong>Total de Vendas:</strong> {{ total_vendas_count }}</p>
-                                    <p><strong>Valor Vendido:</strong> R$ {{ "%.2f"|format(total_vendas) }}</p>
+                                    <p><strong>Total de Vendas:</strong> {{ totais.total_vendas_count }}</p>
+                                    <hr>
+                                    <p class="mb-1"><strong>Vendas (Dinheiro):</strong> R$ {{ "%.2f"|format(totais.dinheiro) }}</p>
+                                    <p class="mb-1"><strong>Vendas (Cartão):</strong> R$ {{ "%.2f"|format(totais.cartao) }}</p>
+                                    <p class="mb-1"><strong>Vendas (PIX):</strong> R$ {{ "%.2f"|format(totais.pix) }}</p>
+                                    <hr>
+                                    <p><strong>Valor Vendido (Total):</strong> R$ {{ "%.2f"|format(totais.total_geral) }}</p>
                                 </div>
                             </div>
                         </div>
@@ -30,7 +34,10 @@
                                     <h6>Informações de Fechamento</h6>
                                     <p><strong>Operador:</strong> {{ current_user.nome }}</p>
                                     <p><strong>Data/Hora:</strong> {{ now.strftime('%d/%m/%Y %H:%M') }}</p>
-                                    <p><strong>Saldo Esperado:</strong> R$ {{ "%.2f"|format(caixa_aberto.saldo_inicial + total_vendas) }}</p>
+                                    <hr>
+                                    <p><strong>Saldo Inicial (Dinheiro):</strong> R$ {{ "%.2f"|format(caixa_aberto.saldo_inicial) }}</p>
+                                    <p><strong>+ Vendas (Dinheiro):</strong> R$ {{ "%.2f"|format(totais.dinheiro) }}</p>
+                                    <p class="fw-bold"><strong>Saldo Esperado (Dinheiro):</strong> R$ {{ "%.2f"|format(saldo_esperado_dinheiro) }}</p>
                                 </div>
                             </div>
                         </div>
@@ -39,19 +46,28 @@
                     <div class="mb-3">
                         <label for="saldo_final" class="form-label">Saldo Final em Caixa (R$):</label>
                         <input type="number" step="0.01" class="form-control" id="saldo_final" 
-                               name="saldo_final" required placeholder="Informe o valor total em caixa">
+                               name="saldo_final" required placeholder="Informe o valor total em dinheiro contado">
                         <div class="form-text">
-                            Digite o valor total em dinheiro encontrado no caixa.
+                            Digite o valor total em <strong>dinheiro</strong> encontrado no caixa.
                             Diferença: 
                             <span id="diferenca" class="fw-bold">R$ 0.00</span>
                         </div>
                     </div>
                     
+                    <!-- Botões (MODIFICADO) -->
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-warning btn-lg">
                             <i class="fas fa-lock"></i> Confirmar Fechamento
                         </button>
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                        
+                        <!-- NOVO BOTÃO DE IMPRESSÃO -->
+                        <a href="{{ url_for('cupom_fechamento') }}" 
+                           target="_blank" 
+                           class="btn btn-info">
+                            <i class="fas fa-print"></i> Imprimir Relatório de Fechamento
+                        </a>
+
+                        <a href="{{ url_for('vendas') }}" class="btn btn-secondary">
                             <i class="fas fa-times"></i> Cancelar
                         </a>
                     </div>
@@ -61,24 +77,28 @@
     </div>
 </div>
 
+<!-- Script (MODIFICADO) -->
 <script>
 // Calcula diferença em tempo real
 document.getElementById('saldo_final').addEventListener('input', function() {
     const saldoFinal = parseFloat(this.value) || 0;
+    
+    // MODIFICADO: Agora usa as variáveis corretas
     const saldoInicial = {{ caixa_aberto.saldo_inicial }};
-    const totalVendas = {{ total_vendas }};
-    const saldoEsperado = saldoInicial + totalVendas;
+    const totalVendasDinheiro = {{ total_vendas_dinheiro }}; // Apenas vendas em dinheiro
+    
+    const saldoEsperado = saldoInicial + totalVendasDinheiro;
     const diferenca = saldoFinal - saldoEsperado;
     
     const diferencaElement = document.getElementById('diferenca');
     diferencaElement.textContent = 'R$ ' + diferenca.toFixed(2);
     
     if (diferenca > 0) {
-        diferencaElement.className = 'fw-bold text-success';
+        diferencaElement.className = 'fw-bold text-success'; // Sobra
     } else if (diferenca < 0) {
-        diferencaElement.className = 'fw-bold text-danger';
+        diferencaElement.className = 'fw-bold text-danger'; // Falta
     } else {
-        diferencaElement.className = 'fw-bold text-primary';
+        diferencaElement.className = 'fw-bold text-primary'; // Correto
     }
 });
 </script>

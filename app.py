@@ -1,16 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from database import db
+from sqlalchemy import func # <-- IMPORTAÇÃO ADICIONADA
 from models import Usuario, Produto, Venda, ItemVenda, MovimentoCaixa
 # Importações de data/hora atualizadas (adicionado 'time')
 from datetime import datetime, timedelta, date, time
 import os
 # NOVAS IMPORTAÇÕES PARA UPLOAD E NOME DE ARQUIVO SEGURO
 from werkzeug.utils import secure_filename
-# =======================================================
-# IMPORTAÇÃO ADICIONADA PARA BUSCA (or_)
-# =======================================================
-from sqlalchemy import or_
 
 # =======================================================
 #               INÍCIO DAS NOVAS IMPORTAÇÕES (EXCEL)
@@ -176,6 +173,9 @@ def inject_context():
 # ROTAS PRINCIPAIS
 # =============================================================================
 
+# =============================================================================
+#           INÍCIO DA ROTA MODIFICADA (DASHBOARD)
+# =============================================================================
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -208,143 +208,97 @@ def dashboard():
     # Movimento de caixa atual (do admin logado)
     caixa_aberto, movimento_atual = get_caixa_aberto()
     
-    # ===========================================================
-    # INÍCIO DA MODIFICAÇÃO: Buscar caixas esquecidos
-    # ===========================================================
-    # Define o início do dia de hoje (meia-noite)
+    # Buscar caixas esquecidos
     hoje_meia_noite = datetime.combine(date.today(), time.min)
-    
-    # Busca caixas que ainda estão 'abertos' E que foram abertos ANTES de hoje
     caixas_esquecidos = MovimentoCaixa.query.filter(
         MovimentoCaixa.status == 'aberto',
         MovimentoCaixa.data_abertura < hoje_meia_noite
     ).order_by(MovimentoCaixa.data_abertura.desc()).all()
-    # ===========================================================
-    # FIM DA MODIFICAÇÃO
-    # ===========================================================
     
-    # ===========================================================
-    # INÍCIO DA MODIFICAÇÃO: Status de todos os caixas (COM DIFERENÇA)
-    # ===========================================================
+    # Status de todos os caixas
     status_caixas = []
-    # Busca todos os usuários que são 'caixa' OU 'admin' e estão 'ativos'
     operadores = Usuario.query.filter(
-        Usuario.perfil.in_(['caixa', 'admin']), # <-- MUDANÇA AQUI
+        Usuario.perfil.in_(['caixa', 'admin']),
         Usuario.ativo == True
     ).order_by(Usuario.nome).all()
 
     for op in operadores:
-        # Busca o último movimento de caixa deste operador
         ultimo_movimento = MovimentoCaixa.query.filter_by(usuario_id=op.id).order_by(MovimentoCaixa.data_abertura.desc()).first()
         
         if ultimo_movimento:
-            
             diferenca = 0.0
-            # *** INÍCIO DA CORREÇÃO ***
-            # Definir valores padrão para saldo_esperado e saldo_informado
             saldo_esperado = 0.0
             saldo_final_informado = 0.0
-            # *** FIM DA CORREÇÃO ***
-
-            # *** INÍCIO DA MODIFICAÇÃO ***
-            # Adicionamos um sinalizador para controlar a exibição no template
             mostrar_diferenca = False
-            # *** FIM DA MODIFICAÇÃO ***
+            
+            # ===========================================================
+            #           INÍCIO DA CORREÇÃO (LÓGICA DO DASHBOARD)
+            # ===========================================================
             
             # Se o último movimento está fechado, calcula a diferença
             if ultimo_movimento.status == 'fechado':
                 
-                # ===========================================================
-                #           INÍCIO DA CORREÇÃO DO BUG (RACE CONDITION)
-                # ===========================================================
-                #
-                # A consulta no 'dashboard' estava usando um filtro de data de 
-                # fechamento (<= data_fechamento) que a rota 'fechar_caixa' 
-                # não usa. Isso causava a inconsistência que você viu.
-                #
-                # Se uma venda fosse salva milissegundos DEPOIS da data de
-                # fechamento, a rota 'fechar_caixa' a via, mas o 'dashboard'
-                # não, resultando em 'Total Esperado: 0.00'.
-                #
-                # REMOVEMOS A LINHA DE FILTRO DE DATA DE FECHAMENTO
-                # para que esta consulta seja IDÊNTICA à da rota 'fechar_caixa'.
-                
-                vendas_periodo = Venda.query.filter(
+                # 1. Busca APENAS as vendas em DINHEIRO daquele período
+                vendas_dinheiro = Venda.query.filter(
                     Venda.data_venda >= ultimo_movimento.data_abertura,
-                    # LINHA REMOVIDA (CAUSADORA DO BUG):
-                    # Venda.data_venda <= ultimo_movimento.data_fechamento,
+                    Venda.data_venda <= ultimo_movimento.data_fechamento, # <-- ADICIONADO PARA PRECISÃO
                     Venda.usuario_id == op.id,
-                    Venda.status == 'finalizada'
+                    Venda.status == 'finalizada',
+                    Venda.forma_pagamento == 'dinheiro' # <-- FILTRO CRUCIAL ADICIONADO
                 ).all()
                 
+                # 2. Soma apenas o total em DINHEIRO
+                total_vendas_dinheiro = sum(venda.valor_total for venda in vendas_dinheiro)
+                
+                # 3. Calcula o saldo esperado (Dinheiro)
+                #    (Saldo Inicial + Vendas em Dinheiro)
+                saldo_esperado = (ultimo_movimento.saldo_inicial or 0) + total_vendas_dinheiro
+                
                 # ===========================================================
-                #            FIM DA CORREÇÃO DO BUG
+                #            FIM DA CORREÇÃO (LÓGICA DO DASHBOARD)
                 # ===========================================================
-                
-                total_vendas = sum(venda.valor_total for venda in vendas_periodo)
-                
-                # Calcula o saldo esperado
-                saldo_esperado = (ultimo_movimento.saldo_inicial or 0) + total_vendas
-                
+
                 # Pega o saldo que foi informado no fechamento
                 saldo_final_informado = ultimo_movimento.saldo_final or 0
                 
                 # Calcula a diferença
                 diferenca = saldo_final_informado - saldo_esperado
 
-                # *** INÍCIO DA MODIFICAÇÃO ***
                 # Verifica se a diferença é (praticamente) zero.
-                # Usamos abs() e um valor pequeno para segurança com floats.
                 if abs(diferenca) > 0.001:
                     mostrar_diferenca = True
-                # *** FIM DA MODIFICAÇÃO ***
             
             status_caixas.append({
                 'nome': op.nome,
-                'status': ultimo_movimento.status, # 'aberto' ou 'fechado'
-                # Define a data relevante (fechamento se fechado, abertura se aberto)
+                'status': ultimo_movimento.status,
                 'data': ultimo_movimento.data_fechamento if ultimo_movimento.status == 'fechado' else ultimo_movimento.data_abertura,
-                'diferenca': diferenca,  # Adiciona a diferença ao dicionário
-                # *** INÍCIO DA CORREÇÃO ***
-                # Adicionar as chaves que faltavam
-                'saldo_esperado': saldo_esperado,
+                'diferenca': diferenca,
+                'saldo_esperado': saldo_esperado, # <-- Agora envia o valor correto
                 'saldo_informado': saldo_final_informado,
-                # *** FIM DA CORREÇÃO ***
-                
-                # *** INÍCIO DA MODIFICAÇÃO ***
-                # Passa o sinalizador para o template
                 'mostrar_diferenca': mostrar_diferenca
-                # *** FIM DA MODIFICAÇÃO ***
             })
         else:
             # Operador nunca abriu um caixa
             status_caixas.append({
                 'nome': op.nome,
-                'status': 'nunca_aberto', # Um status para 'Inativo' ou 'Nunca Abriu'
+                'status': 'nunca_aberto',
                 'data': None,
-                'diferenca': 0.0,  # Adiciona a diferença (padrão 0)
-                # *** INÍCIO DA CORREÇÃO ***
-                # Adicionar chaves padrão para consistência
+                'diferenca': 0.0,
                 'saldo_esperado': 0.0,
                 'saldo_informado': 0.0,
-                # *** FIM DA CORREÇÃO ***
-
-                # *** INÍCIO DA MODIFICAÇÃO ***
-                # Define o sinalizador como falso
                 'mostrar_diferenca': False
-                # *** FIM DA MODIFICAÇÃO ***
             })
-    # ===========================================================
-    # FIM DA MODIFICAÇÃO
-    # ===========================================================
 
     return render_template('dashboard.html',
                          total_hoje=total_hoje,
                          estoque_baixo=estoque_baixo,
                          total_produtos=total_produtos,
                          movimento_atual=movimento_atual,
-                         caixas_esquecidos=caixas_esquecidos, # <- Variável caixas esquecidos
-                         status_caixas=status_caixas) # <- Variável status de todos os caixas
+                         caixas_esquecidos=caixas_esquecidos,
+                         status_caixas=status_caixas)
+# =============================================================================
+#           FIM DA ROTA MODIFICADA (DASHBOARD)
+# =============================================================================
 
 # =============================================================================
 # ROTAS DO MÓDULO DE CAIXA
@@ -382,6 +336,9 @@ def abrir_caixa():
     return render_template('abrir_caixa.html')
 
 
+# =============================================================================
+#           INÍCIO DA ROTA MODIFICADA (FECHAR CAIXA)
+# =============================================================================
 @app.route('/caixa/fechar', methods=['GET', 'POST'])
 @login_required
 def fechar_caixa():
@@ -407,27 +364,25 @@ def fechar_caixa():
         momento_fechamento = datetime.now()
         
         # 2. Calcula total de vendas do período ATÉ O MOMENTO DO FECHAMENTO
-        #    (Esta consulta agora é consistente com a do dashboard)
-        vendas_periodo = Venda.query.filter(
-            Venda.data_venda >= movimento_atual.data_abertura,
-            # Adicionamos este filtro para garantir que vendas 
-            # futuras (após o clique) não entrem.
+        vendas_periodo_post = Venda.query.filter(
+            Venda.data_venda >= movimento_atual.data_abertura, 
             Venda.data_venda <= momento_fechamento, 
-            Venda.usuario_id == current_user.id, # Apenas vendas deste usuário
+            Venda.usuario_id == current_user.id,
             Venda.status == 'finalizada'
         ).all()
         # *** FIM DA CORREÇÃO DE CONSISTÊNCIA ***
         
-        total_vendas = sum(venda.valor_total for venda in vendas_periodo)
+        # (O total de vendas para o flash message pode ser o geral)
+        total_vendas_geral = sum(venda.valor_total for venda in vendas_periodo_post)
         
         # Atualiza movimento de caixa
-        movimento_atual.data_fechamento = momento_fechamento # <-- Usa o mesmo momento
+        movimento_atual.data_fechamento = momento_fechamento
         movimento_atual.saldo_final = saldo_final
         movimento_atual.status = 'fechado'
         
         db.session.commit()
         
-        flash(f'Caixa fechado com sucesso! Total de vendas: R$ {total_vendas:.2f}', 'success')
+        flash(f'Caixa fechado com sucesso! Total de vendas: R$ {total_vendas_geral:.2f}', 'success')
         if current_user.is_admin():
             return redirect(url_for('dashboard'))
         else:
@@ -435,20 +390,54 @@ def fechar_caixa():
     
     # --- LÓGICA DO MÉTODO GET (Apenas para exibir a tela) ---
     # Calcula estatísticas para exibir no fechamento
-    # (Esta consulta está OK, pois é em tempo real)
-    vendas_periodo = Venda.query.filter(
-        Venda.data_venda >= movimento_atual.data_abertura,
-        Venda.usuario_id == current_user.id, # Apenas vendas deste usuário
-        Venda.status == 'finalizada'
-    ).all()
     
-    total_vendas = sum(venda.valor_total for venda in vendas_periodo)
-    total_vendas_count = len(vendas_periodo)
+    # Query base das vendas no período
+    query_vendas = Venda.query.filter(
+        Venda.data_venda >= movimento_atual.data_abertura,
+        Venda.usuario_id == current_user.id,
+        Venda.status == 'finalizada'
+    )
+    
+    # 1. Total de Vendas (para o JavaScript e contagem)
+    vendas_periodo_get = query_vendas.all()
+    total_vendas_count = len(vendas_periodo_get)
+
+    # 2. Agrupa os totais por forma de pagamento
+    vendas_agrupadas = db.session.query(
+        Venda.forma_pagamento,
+        func.sum(Venda.valor_total).label('total')
+    ).filter(
+        Venda.data_venda >= movimento_atual.data_abertura,
+        Venda.usuario_id == current_user.id,
+        Venda.status == 'finalizada'
+    ).group_by(Venda.forma_pagamento).all()
+
+    # Prepara o dicionário de totais
+    totais = {
+        'dinheiro': 0.0,
+        'cartao': 0.0,
+        'pix': 0.0,
+        'total_geral': 0.0
+    }
+    
+    for forma, total in vendas_agrupadas:
+        if forma in totais:
+            totais[forma] = float(total or 0.0)
+        totais['total_geral'] += float(total or 0.0)
+
+    # O 'saldo_esperado' é o (Saldo Inicial + Vendas em Dinheiro)
+    # O 'total_vendas' (para o script JS) deve ser apenas o de dinheiro
+    saldo_esperado_dinheiro = movimento_atual.saldo_inicial + totais['dinheiro']
     
     return render_template('fechar_caixa.html',
                          caixa_aberto=movimento_atual,
-                         total_vendas=total_vendas,
+                         totais=totais, # Enviando o dict de totais
+                         saldo_esperado_dinheiro=saldo_esperado_dinheiro,
+                         total_vendas_dinheiro=totais['dinheiro'], # Para o JS
                          total_vendas_count=total_vendas_count)
+# =============================================================================
+#           FIM DA ROTA MODIFICADA (FECHAR CAIXA)
+# =============================================================================
 
 
 # =============================================================================
@@ -771,11 +760,19 @@ def relatorios():
     # --- Lógica de Filtro de Forma de Pagamento ---
     forma_pgto_selecionada = request.args.get('forma_pgto', 'todos') # 'todos' é o padrão
 
-    # Define o padrão (hoje) se nenhuma data for fornecida
+    # ===================================================================
+    #           INÍCIO DA CORREÇÃO (PADRÃO DE 7 DIAS)
+    # ===================================================================
+    # Define o padrão (últimos 7 dias) se nenhuma data for fornecida
+    hoje = date.today()
     if not data_inicio_str:
-        data_inicio_str = date.today().strftime('%Y-%m-%d')
+        # Pega 6 dias atrás (para completar 7 dias)
+        data_inicio_str = (hoje - timedelta(days=6)).strftime('%Y-%m-%d')
     if not data_fim_str:
-        data_fim_str = date.today().strftime('%Y-%m-%d')
+        data_fim_str = hoje.strftime('%Y-%m-%d')
+    # ===================================================================
+    #            FIM DA CORREÇÃO (PADRÃO DE 7 DIAS)
+    # ===================================================================
 
     try:
         # Converte as strings para objetos datetime (início do dia e fim do dia)
@@ -783,8 +780,12 @@ def relatorios():
         data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
     except ValueError:
         flash('Formato de data inválido.', 'danger')
-        data_inicio = datetime.now().replace(hour=0, minute=0, second=0)
+        # Se inválido, volta para o padrão de 7 dias
         data_fim = datetime.now().replace(hour=23, minute=59, second=59)
+        data_inicio = (data_fim - timedelta(days=6)).replace(hour=0, minute=0, second=0)
+        data_inicio_str = data_inicio.strftime('%Y-%m-%d')
+        data_fim_str = data_fim.strftime('%Y-%m-%d')
+
 
     # Busca todos os caixas (usuários) para o filtro dropdown
     caixas = Usuario.query.order_by(Usuario.nome).all()
@@ -914,18 +915,29 @@ def exportar_relatorio():
         return redirect(url_for('vendas'))
 
     # --- 1. REPETE A LÓGICA DE FILTRO DA ROTA 'relatorios' ---
-    data_inicio_str = request.args.get('inicio', date.today().strftime('%Y-%m-%d'))
-    data_fim_str = request.args.get('fim', date.today().strftime('%Y-%m-%d'))
+    # (Pega os valores da query string)
+    data_inicio_str = request.args.get('inicio')
+    data_fim_str = request.args.get('fim')
     caixa_id_str = request.args.get('caixa_id', '0')
     caixa_selecionado = int(caixa_id_str)
     forma_pgto_selecionada = request.args.get('forma_pgto', 'todos')
+
+    # (Define o padrão de 7 dias se não vier na query string)
+    hoje = date.today()
+    if not data_inicio_str:
+        data_inicio_str = (hoje - timedelta(days=6)).strftime('%Y-%m-%d')
+    if not data_fim_str:
+        data_fim_str = hoje.strftime('%Y-%m-%d')
 
     try:
         data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
         data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
     except ValueError:
-        data_inicio = datetime.now().replace(hour=0, minute=0, second=0)
         data_fim = datetime.now().replace(hour=23, minute=59, second=59)
+        data_inicio = (data_fim - timedelta(days=6)).replace(hour=0, minute=0, second=0)
+        data_inicio_str = data_inicio.strftime('%Y-%m-%d')
+        data_fim_str = data_fim.strftime('%Y-%m-%d')
+
 
     # --- 2. EXECUTA A MESMA CONSULTA DE ITENS VENDIDOS ---
     query_itens = db.session.query(
@@ -1046,59 +1058,6 @@ def api_buscar_produto(codigo):
         'imagem_url': imagem_path
     })
 
-# =============================================================================
-#           INÍCIO DA NOVA ROTA (BUSCAR PRODUTO POR NOME)
-# =============================================================================
-@app.route('/api/produtos/buscar')
-@login_required
-def api_buscar_produto_por_nome():
-    """
-    API para buscar produtos pelo nome (ou código de barras)
-    Usado pelo modal de busca (F2).
-    """
-    # Verifica se o caixa está aberto
-    caixa_aberto, _ = get_caixa_aberto()
-    if not caixa_aberto:
-        return jsonify({'error': 'Caixa está fechado!'}), 403
-    
-    termo_busca = request.args.get('nome', '')
-
-    # Se o termo for muito curto, não retorna nada
-    if len(termo_busca) < 2:
-        return jsonify([]) # Retorna uma lista vazia
-
-    # Busca produtos ativos onde o nome OU o código de barras
-    # contenham o termo de busca (case-insensitive)
-    produtos = Produto.query.filter(
-        or_(
-            Produto.nome.ilike(f'%{termo_busca}%'),
-            Produto.codigo_barras.ilike(f'%{termo_busca}%')
-        ),
-        Produto.ativo == True
-    ).order_by(Produto.nome).limit(20).all() # Limita a 20 resultados
-
-    resultados = []
-    for produto in produtos:
-        # Gera a URL da imagem se ela existir
-        imagem_path = None
-        if produto.imagem_url:
-            imagem_path = url_for('static', filename=produto.imagem_url.replace('static/', '', 1))
-            
-        resultados.append({
-            'id': produto.id,
-            'nome': produto.nome,
-            'codigo_barras': produto.codigo_barras, # Importante para a seleção
-            'preco_venda': produto.preco_venda,
-            'estoque_atual': produto.estoque_atual,
-            'imagem_url': imagem_path
-        })
-
-    return jsonify(resultados)
-# =============================================================================
-#           FIM DA NOVA ROTA
-# =============================================================================
-
-
 @app.route('/vendas/finalizar', methods=['POST'])
 @login_required
 def finalizar_venda():
@@ -1199,6 +1158,73 @@ def finalizar_venda():
     except Exception as e:
         db.session.rollback() # Desfaz qualquer mudança no banco em caso de erro
         return jsonify({'error': str(e)}), 400
+
+# =============================================================================
+#           INÍCIO DA NOVA ROTA (CUPOM FECHAMENTO)
+# =============================================================================
+
+@app.route('/caixa/cupom_fechamento')
+@login_required
+def cupom_fechamento():
+    """
+    Gera um cupom/relatório de fechamento para o caixa ABERTO atual.
+    """
+    caixa_aberto, movimento_atual = get_caixa_aberto()
+    
+    if not caixa_aberto:
+        flash('Não há caixa aberto para gerar relatório.', 'warning')
+        if current_user.is_admin():
+            return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
+
+    # --- Recalcula os totais para o cupom ---
+    
+    # 1. Query base das vendas no período
+    query_vendas = Venda.query.filter(
+        Venda.data_venda >= movimento_atual.data_abertura,
+        Venda.usuario_id == current_user.id,
+        Venda.status == 'finalizada'
+    )
+    
+    # 2. Total de Vendas (para contagem)
+    vendas_periodo = query_vendas.all()
+    total_vendas_count = len(vendas_periodo)
+
+    # 3. Agrupa os totais por forma de pagamento
+    vendas_agrupadas = db.session.query(
+        Venda.forma_pagamento,
+        func.sum(Venda.valor_total).label('total')
+    ).filter(
+        Venda.data_venda >= movimento_atual.data_abertura,
+        Venda.usuario_id == current_user.id,
+        Venda.status == 'finalizada'
+    ).group_by(Venda.forma_pagamento).all()
+
+    # 4. Prepara o dicionário de totais
+    totais = {
+        'dinheiro': 0.0,
+        'cartao': 0.0,
+        'pix': 0.0,
+        'total_geral': 0.0,
+        'total_vendas_count': total_vendas_count
+    }
+    
+    for forma, total in vendas_agrupadas:
+        if forma in totais:
+            totais[forma] = float(total or 0.0)
+        totais['total_geral'] += float(total or 0.0)
+    
+    # O "Saldo Esperado em Dinheiro"
+    saldo_esperado_dinheiro = movimento_atual.saldo_inicial + totais['dinheiro']
+
+    return render_template('cupom_fechamento.html', 
+                         caixa=movimento_atual,
+                         totais=totais,
+                         saldo_esperado_dinheiro=saldo_esperado_dinheiro)
+
+# =============================================================================
+#           FIM DA NOVA ROTA (CUPOM FECHAMENTO)
+# =============================================================================
 
 # =============================================================================
 # INICIALIZAÇÃO DO BANCO DE DADOS
