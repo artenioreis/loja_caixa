@@ -99,15 +99,7 @@ Caixa {% if caixa_aberto %}Aberto{% else %}Fechado{% endif %}
 {% for caixa in caixas_esquecidos %}
 <li>
 <strong>Operador:</strong> {{ caixa.usuario.nome }} 
-
-
-
-
 <strong>Aberto desde:</strong> {{ caixa.data_abertura.strftime('%d/%m/%Y %H:%M') }} 
-
-
-
-
 <strong>Saldo Inicial:</strong> R$ {{ "%.2f"|format(caixa.saldo_inicial) }}
 </li>
 {% endfor %}
@@ -157,7 +149,6 @@ Caixa {% if caixa_aberto %}Aberto{% else %}Fechado{% endif %}
         </div>
         <div class="card-body">
             <p><strong>Admin Logado:</strong> {{ current_user.nome }}</p> <p><strong>Data/Hora:</strong> {{ now.strftime('%d/%m/%Y %H:%M') }}</p>
-            
             <hr>
             <h6><i class="fas fa-cash-register"></i> Monitoramento de Caixas</h6> 
             <ul class="list-group">
@@ -173,7 +164,7 @@ Caixa {% if caixa_aberto %}Aberto{% else %}Fechado{% endif %}
                             {% elif op_status.status == 'fechado' %}
                                 <br><span class="text-muted">Fechado em: {{ op_status.data.strftime('%d/%m %H:%M') }}</span>
                             {% endif %}
-                        </span>
+                            </span>
                         
                         <div class="text-end">
                             {% if op_status.status == 'aberto' %}

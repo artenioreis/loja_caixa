@@ -3,7 +3,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from database import db
 from sqlalchemy import func # <-- IMPORTAÇÃO ADICIONADA
 from models import Usuario, Produto, Venda, ItemVenda, MovimentoCaixa
-# Importações de data/hora atualizadas (adicionado 'time')
+# Importações de data/hora atualizadas (agora usando APENAS HORA LOCAL)
 from datetime import datetime, timedelta, date, time
 import os
 # NOVAS IMPORTAÇÕES PARA UPLOAD E NOME DE ARQUIVO SEGURO
@@ -163,11 +163,16 @@ def inject_context():
     if current_user.is_authenticated:
         caixa_aberto, movimento_atual = get_caixa_aberto()
     
+    # ===========================================================
+    #           CORREÇÃO DE FUSO (VISUAL)
+    # ===========================================================
+    # Voltando para datetime.now() para usar a HORA LOCAL
     return dict(
         caixa_aberto=caixa_aberto,
         movimento_atual=movimento_atual,
-        now=datetime.now()
+        now=datetime.now() # <-- CORRIGIDO
     )
+    # ===========================================================
 
 # =============================================================================
 # ROTAS PRINCIPAIS
@@ -186,10 +191,14 @@ def dashboard():
         flash('Acesso não autorizado!', 'danger')
         return redirect(url_for('vendas'))
 
+    # ===========================================================
+    #           CORREÇÃO DE FUSO (Usar HORA LOCAL)
+    # ===========================================================
     # Estatísticas para o dashboard
-    hoje = datetime.now().date()
+    hoje = date.today() # CORRIGIDO (era datetime.utcnow().date())
     
     # Total vendido hoje
+    # Usando func.date para comparar apenas a data
     vendas_hoje = Venda.query.filter(
         db.func.date(Venda.data_venda) == hoje,
         Venda.status == 'finalizada'
@@ -209,11 +218,15 @@ def dashboard():
     caixa_aberto, movimento_atual = get_caixa_aberto()
     
     # Buscar caixas esquecidos
-    hoje_meia_noite = datetime.combine(date.today(), time.min)
+    # (Compara a data de abertura local com o início do dia local)
+    hoje_meia_noite_local = datetime.combine(hoje, time.min) # CORRIGIDO
     caixas_esquecidos = MovimentoCaixa.query.filter(
         MovimentoCaixa.status == 'aberto',
-        MovimentoCaixa.data_abertura < hoje_meia_noite
+        MovimentoCaixa.data_abertura < hoje_meia_noite_local
     ).order_by(MovimentoCaixa.data_abertura.desc()).all()
+    # ===========================================================
+    #           FIM DA CORREÇÃO DE FUSO
+    # ===========================================================
     
     # Status de todos os caixas
     status_caixas = []
@@ -231,20 +244,17 @@ def dashboard():
             saldo_final_informado = 0.0
             mostrar_diferenca = False
             
-            # ===========================================================
-            #           INÍCIO DA CORREÇÃO (LÓGICA DO DASHBOARD)
-            # ===========================================================
-            
             # Se o último movimento está fechado, calcula a diferença
             if ultimo_movimento.status == 'fechado':
                 
                 # 1. Busca APENAS as vendas em DINHEIRO daquele período
+                #    (Agora comparando hora local com hora local)
                 vendas_dinheiro = Venda.query.filter(
                     Venda.data_venda >= ultimo_movimento.data_abertura,
-                    Venda.data_venda <= ultimo_movimento.data_fechamento, # <-- ADICIONADO PARA PRECISÃO
+                    Venda.data_venda <= ultimo_movimento.data_fechamento, 
                     Venda.usuario_id == op.id,
                     Venda.status == 'finalizada',
-                    Venda.forma_pagamento == 'dinheiro' # <-- FILTRO CRUCIAL ADICIONADO
+                    Venda.forma_pagamento == 'dinheiro'
                 ).all()
                 
                 # 2. Soma apenas o total em DINHEIRO
@@ -253,10 +263,6 @@ def dashboard():
                 # 3. Calcula o saldo esperado (Dinheiro)
                 #    (Saldo Inicial + Vendas em Dinheiro)
                 saldo_esperado = (ultimo_movimento.saldo_inicial or 0) + total_vendas_dinheiro
-                
-                # ===========================================================
-                #            FIM DA CORREÇÃO (LÓGICA DO DASHBOARD)
-                # ===========================================================
 
                 # Pega o saldo que foi informado no fechamento
                 saldo_final_informado = ultimo_movimento.saldo_final or 0
@@ -273,7 +279,7 @@ def dashboard():
                 'status': ultimo_movimento.status,
                 'data': ultimo_movimento.data_fechamento if ultimo_movimento.status == 'fechado' else ultimo_movimento.data_abertura,
                 'diferenca': diferenca,
-                'saldo_esperado': saldo_esperado, # <-- Agora envia o valor correto
+                'saldo_esperado': saldo_esperado, 
                 'saldo_informado': saldo_final_informado,
                 'mostrar_diferenca': mostrar_diferenca
             })
@@ -320,7 +326,7 @@ def abrir_caixa():
     if request.method == 'POST':
         saldo_inicial = float(request.form.get('saldo_inicial', 0))
         
-        # Cria novo movimento de caixa
+        # Cria novo movimento de caixa (models.py usará datetime.now() por padrão)
         novo_caixa = MovimentoCaixa(
             saldo_inicial=saldo_inicial,
             usuario_id=current_user.id,
@@ -359,18 +365,22 @@ def fechar_caixa():
     if request.method == 'POST':
         saldo_final = float(request.form.get('saldo_final', 0))
         
-        # *** INÍCIO DA CORREÇÃO DE CONSISTÊNCIA ***
-        # 1. Define o momento exato do fechamento UMA VEZ
-        momento_fechamento = datetime.now()
+        # ===========================================================
+        #           CORREÇÃO DE FUSO (Usar HORA LOCAL)
+        # ===========================================================
+        # 1. Define o momento exato do fechamento UMA VEZ (em HORA LOCAL)
+        momento_fechamento = datetime.now() # CORRIGIDO (era utcnow)
         
-        # 2. Calcula total de vendas do período ATÉ O MOMENTO DO FECHAMENTO
+        # 2. Calcula total de vendas do período ATÉ O MOMENTO DO FECHAMENTO (LOCAL)
         vendas_periodo_post = Venda.query.filter(
             Venda.data_venda >= movimento_atual.data_abertura, 
-            Venda.data_venda <= momento_fechamento, 
+            Venda.data_venda <= momento_fechamento, # <-- Correto
             Venda.usuario_id == current_user.id,
             Venda.status == 'finalizada'
         ).all()
-        # *** FIM DA CORREÇÃO DE CONSISTÊNCIA ***
+        # ===========================================================
+        #           FIM DA CORREÇÃO DE FUSO
+        # ===========================================================
         
         # (O total de vendas para o flash message pode ser o geral)
         total_vendas_geral = sum(venda.valor_total for venda in vendas_periodo_post)
@@ -391,9 +401,10 @@ def fechar_caixa():
     # --- LÓGICA DO MÉTODO GET (Apenas para exibir a tela) ---
     # Calcula estatísticas para exibir no fechamento
     
-    # Query base das vendas no período
+    # Query base das vendas no período (abertura local até agora local)
     query_vendas = Venda.query.filter(
         Venda.data_venda >= movimento_atual.data_abertura,
+        Venda.data_venda <= datetime.now(), # Filtra até o momento atual
         Venda.usuario_id == current_user.id,
         Venda.status == 'finalizada'
     )
@@ -408,6 +419,7 @@ def fechar_caixa():
         func.sum(Venda.valor_total).label('total')
     ).filter(
         Venda.data_venda >= movimento_atual.data_abertura,
+        Venda.data_venda <= datetime.now(), # Filtra até o momento atual
         Venda.usuario_id == current_user.id,
         Venda.status == 'finalizada'
     ).group_by(Venda.forma_pagamento).all()
@@ -488,6 +500,7 @@ def produtos_novo():
             estoque_atual=int(request.form.get('estoque_atual', 0)),
             estoque_minimo=int(request.form.get('estoque_minimo', 0)),
             ativo=True
+            # O model usará datetime.now() para data_criacao
         )
         
         # --- Lógica de Upload da Imagem ---
@@ -541,6 +554,7 @@ def produtos_editar(id):
         produto.categoria = request.form.get('categoria')
         produto.estoque_atual = int(request.form.get('estoque_atual', 0))
         produto.estoque_minimo = int(request.form.get('estoque_minimo', 0))
+        # O model usará datetime.now() para data_atualizacao (onupdate)
 
         # --- Lógica de Upload da Imagem ---
         if 'imagem' in request.files:
@@ -634,6 +648,7 @@ def usuarios_novo():
             email=email,
             perfil=perfil,
             ativo=True
+            # O model usará datetime.now() para data_criacao
         )
         novo_usuario.set_senha(senha)
         
@@ -761,17 +776,17 @@ def relatorios():
     forma_pgto_selecionada = request.args.get('forma_pgto', 'todos') # 'todos' é o padrão
 
     # ===================================================================
-    #           INÍCIO DA CORREÇÃO (PADRÃO DE 7 DIAS)
+    #           INÍCIO DA CORREÇÃO (PADRÃO DE 7 DIAS EM HORA LOCAL)
     # ===================================================================
     # Define o padrão (últimos 7 dias) se nenhuma data for fornecida
-    hoje = date.today()
+    hoje_local = date.today() # CORRIGIDO
     if not data_inicio_str:
         # Pega 6 dias atrás (para completar 7 dias)
-        data_inicio_str = (hoje - timedelta(days=6)).strftime('%Y-%m-%d')
+        data_inicio_str = (hoje_local - timedelta(days=6)).strftime('%Y-%m-%d')
     if not data_fim_str:
-        data_fim_str = hoje.strftime('%Y-%m-%d')
+        data_fim_str = hoje_local.strftime('%Y-%m-%d')
     # ===================================================================
-    #            FIM DA CORREÇÃO (PADRÃO DE 7 DIAS)
+    #            FIM DA CORREÇÃO (PADRÃO DE 7 DIAS EM HORA LOCAL)
     # ===================================================================
 
     try:
@@ -780,11 +795,14 @@ def relatorios():
         data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
     except ValueError:
         flash('Formato de data inválido.', 'danger')
-        # Se inválido, volta para o padrão de 7 dias
-        data_fim = datetime.now().replace(hour=23, minute=59, second=59)
-        data_inicio = (data_fim - timedelta(days=6)).replace(hour=0, minute=0, second=0)
-        data_inicio_str = data_inicio.strftime('%Y-%m-%d')
-        data_fim_str = data_fim.strftime('%Y-%m-%d')
+        # Se inválido, volta para o padrão de 7 dias LOCAL
+        data_fim_dt_local = datetime.now().replace(hour=23, minute=59, second=59) # CORRIGIDO
+        data_inicio_dt_local = (data_fim_dt_local - timedelta(days=6)).replace(hour=0, minute=0, second=0) # CORRIGIDO
+        data_inicio_str = data_inicio_dt_local.strftime('%Y-%m-%d')
+        data_fim_str = data_fim_dt_local.strftime('%Y-%m-%d')
+        # Define os objetos de data/hora para a consulta
+        data_inicio = data_inicio_dt_local
+        data_fim = data_fim_dt_local
 
 
     # Busca todos os caixas (usuários) para o filtro dropdown
@@ -922,21 +940,29 @@ def exportar_relatorio():
     caixa_selecionado = int(caixa_id_str)
     forma_pgto_selecionada = request.args.get('forma_pgto', 'todos')
 
-    # (Define o padrão de 7 dias se não vier na query string)
-    hoje = date.today()
+    # ===========================================================
+    #           CORREÇÃO DE FUSO (Usar HORA LOCAL)
+    # ===========================================================
+    # (Define o padrão de 7 dias LOCAL se não vier na query string)
+    hoje_local = date.today() # CORRIGIDO
     if not data_inicio_str:
-        data_inicio_str = (hoje - timedelta(days=6)).strftime('%Y-%m-%d')
+        data_inicio_str = (hoje_local - timedelta(days=6)).strftime('%Y-%m-%d')
     if not data_fim_str:
-        data_fim_str = hoje.strftime('%Y-%m-%d')
+        data_fim_str = hoje_local.strftime('%Y-%m-%d')
 
     try:
         data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
         data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
     except ValueError:
-        data_fim = datetime.now().replace(hour=23, minute=59, second=59)
-        data_inicio = (data_fim - timedelta(days=6)).replace(hour=0, minute=0, second=0)
-        data_inicio_str = data_inicio.strftime('%Y-%m-%d')
-        data_fim_str = data_fim.strftime('%Y-%m-%d')
+        data_fim_dt_local = datetime.now().replace(hour=23, minute=59, second=59) # CORRIGIDO
+        data_inicio_dt_local = (data_fim_dt_local - timedelta(days=6)).replace(hour=0, minute=0, second=0) # CORRIGIDO
+        data_inicio_str = data_inicio_dt_local.strftime('%Y-%m-%d')
+        data_fim_str = data_fim_dt_local.strftime('%Y-%m-%d')
+        data_inicio = data_inicio_dt_local
+        data_fim = data_fim_dt_local
+    # ===========================================================
+    #           FIM DA CORREÇÃO DE FUSO
+    # ===========================================================
 
 
     # --- 2. EXECUTA A MESMA CONSULTA DE ITENS VENDIDOS ---
@@ -961,7 +987,7 @@ def exportar_relatorio():
     for item in itens_vendidos_detalhe:
         dados_para_planilha.append({
             'ID Venda': item.venda.id,
-            'Data Venda': item.venda.data_venda.strftime('%Y-%m-%d %H:%M:%S'),
+            'Data Venda': item.venda.data_venda.strftime('%Y-%m-%d %H:%M:%S'), # Agora está em hora local
             'Operador': item.venda.operador.nome,
             'Forma Pgto': item.venda.forma_pagamento.title(),
             'ID Produto': item.produto.id,
@@ -1082,8 +1108,12 @@ def finalizar_venda():
         valor_total_venda = 0
         itens_venda_db = []
         
-        # Gera o número da venda
-        numero_venda = f"V{int(datetime.now().timestamp())}"
+        # ===========================================================
+        #           CORREÇÃO DE FUSO (Usar HORA LOCAL)
+        # ===========================================================
+        # Gera o número da venda (usando timestamp LOCAL para consistência)
+        numero_venda = f"V{int(datetime.now().timestamp())}" # CORRIGIDO (era utcnow)
+        # ===========================================================
         
         # --- INÍCIO DA CORREÇÃO (NoneType para float) ---
         # Pega o valor_pago do JSON
@@ -1091,7 +1121,7 @@ def finalizar_venda():
         # Garante que não seja NoneType antes de converter. Se for None, usa 0.
         valor_pago_float = float(valor_pago_json or 0)
 
-        # Cria a Venda principal
+        # Cria a Venda principal (o model usará datetime.now() por padrão)
         nova_venda = Venda(
             numero_venda=numero_venda,
             valor_total=0, # Será calculado
@@ -1179,9 +1209,10 @@ def cupom_fechamento():
 
     # --- Recalcula os totais para o cupom ---
     
-    # 1. Query base das vendas no período
+    # 1. Query base das vendas no período (abertura local até agora local)
     query_vendas = Venda.query.filter(
         Venda.data_venda >= movimento_atual.data_abertura,
+        Venda.data_venda <= datetime.now(), # CORRIGIDO (era utcnow)
         Venda.usuario_id == current_user.id,
         Venda.status == 'finalizada'
     )
@@ -1196,6 +1227,7 @@ def cupom_fechamento():
         func.sum(Venda.valor_total).label('total')
     ).filter(
         Venda.data_venda >= movimento_atual.data_abertura,
+        Venda.data_venda <= datetime.now(), # CORRIGIDO (era utcnow)
         Venda.usuario_id == current_user.id,
         Venda.status == 'finalizada'
     ).group_by(Venda.forma_pagamento).all()
@@ -1243,6 +1275,7 @@ def init_db():
                 nome='Administrador',
                 email='admin@loja.com',
                 perfil='admin'
+                # O model usará datetime.now() para data_criacao
             )
             admin.set_senha('admin123')
             
@@ -1251,6 +1284,7 @@ def init_db():
                 nome='Operador Caixa',
                 email='caixa@loja.com',
                 perfil='caixa'
+                # O model usará datetime.now() para data_criacao
             )
             caixa.set_senha('caixa123')
             
@@ -1268,6 +1302,7 @@ def init_db():
                     categoria='Alimentos',
                     estoque_atual=50,
                     estoque_minimo=10
+                    # O model usará datetime.now() para data_criacao
                 ),
                 Produto(
                     codigo_barras='7891000053508',
@@ -1319,11 +1354,14 @@ if __name__ == '__main__':
     # Garante que o init_db() rode dentro do contexto da app
     with app.app_context():
         # Verifica se o banco de dados já existe antes de inicializar
+        # CORREÇÃO: o app.instance_path é o local correto para o 'loja.db'
         db_path = os.path.join(app.instance_path, 'loja.db')
         if not os.path.exists(db_path):
-            print("Banco de dados não encontrado. Inicializando...")
+            print(f"Banco de dados não encontrado em {db_path}. Inicializando...")
+            # Cria o diretório 'instance' se não existir
+            os.makedirs(app.instance_path, exist_ok=True)
             init_db()
         else:
-            print("Banco de dados já existe. Pulando inicialização.")
+            print(f"Banco de dados encontrado em {db_path}. Pulando inicialização.")
             
     app.run(debug=True, host='0.0.0.0', port=5000)

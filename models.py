@@ -13,7 +13,13 @@ class Usuario(db.Model, UserMixin):
     senha_hash = db.Column(db.String(200), nullable=False)
     perfil = db.Column(db.String(20), nullable=False)  # 'admin' ou 'caixa'
     ativo = db.Column(db.Boolean, default=True)
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    # =======================================================
+    #                 INÍCIO DA ALTERAÇÃO
+    # =======================================================
+    data_criacao = db.Column(db.DateTime, default=datetime.now) # Era utcnow
+    # =======================================================
+    #                  FIM DA ALTERAÇÃO
+    # =======================================================
     
     # Relacionamento com vendas
     vendas = db.relationship('Venda', backref='operador', lazy=True)
@@ -46,8 +52,14 @@ class Produto(db.Model):
     estoque_atual = db.Column(db.Integer, default=0)
     estoque_minimo = db.Column(db.Integer, default=0)
     ativo = db.Column(db.Boolean, default=True)
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
-    data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # =======================================================
+    #                 INÍCIO DA ALTERAÇÃO
+    # =======================================================
+    data_criacao = db.Column(db.DateTime, default=datetime.now) # Era utcnow
+    data_atualizacao = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now) # Era utcnow
+    # =======================================================
+    #                  FIM DA ALTERAÇÃO
+    # =======================================================
     
     # NOVO CAMPO PARA IMAGEM
     imagem_url = db.Column(db.String(200), nullable=True) # Armazena o caminho relativo da imagem
@@ -61,7 +73,13 @@ class Venda(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     numero_venda = db.Column(db.String(20), unique=True, nullable=False)
-    data_venda = db.Column(db.DateTime, default=datetime.utcnow)
+    # =======================================================
+    #                 INÍCIO DA ALTERAÇÃO
+    # =======================================================
+    data_venda = db.Column(db.DateTime, default=datetime.now) # Era utcnow
+    # =======================================================
+    #                  FIM DA ALTERAÇÃO
+    # =======================================================
     valor_total = db.Column(db.Float, nullable=False)
     valor_pago = db.Column(db.Float, nullable=False)
     troco = db.Column(db.Float, nullable=False)
@@ -88,7 +106,13 @@ class MovimentoCaixa(db.Model):
     __tablename__ = 'movimento_caixa'
     
     id = db.Column(db.Integer, primary_key=True)
-    data_abertura = db.Column(db.DateTime, default=datetime.utcnow)
+    # =======================================================
+    #                 INÍCIO DA ALTERAÇÃO
+    # =======================================================
+    data_abertura = db.Column(db.DateTime, default=datetime.now) # Era utcnow
+    # =======================================================
+    #                  FIM DA ALTERAÇÃO
+    # =======================================================
     data_fechamento = db.Column(db.DateTime)
     saldo_inicial = db.Column(db.Float, nullable=False)
     saldo_final = db.Column(db.Float)
