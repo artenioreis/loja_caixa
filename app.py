@@ -601,6 +601,96 @@ def produtos_deletar(id):
 
     return redirect(url_for('produtos'))
 
+# =============================================================================
+#           INÍCIO DA NOVA ROTA (IMPORTAR EXCEL)
+# =============================================================================
+@app.route('/produtos/importar', methods=['GET', 'POST'])
+@login_required
+def produtos_importar():
+    """Rota para importar produtos de um arquivo .xlsx"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('vendas'))
+
+    if request.method == 'POST':
+        # Verifica se o arquivo foi enviado
+        if 'arquivo_excel' not in request.files:
+            flash('Nenhum arquivo selecionado.', 'danger')
+            return redirect(request.url)
+        
+        file = request.files['arquivo_excel']
+        
+        # Verifica se o nome do arquivo é válido
+        if file.filename == '':
+            flash('Nenhum arquivo selecionado.', 'danger')
+            return redirect(request.url)
+
+        # Verifica a extensão
+        if file and file.filename.endswith('.xlsx'):
+            try:
+                df = pd.read_excel(file)
+
+                # Verifica as colunas obrigatórias
+                colunas_necessarias = ['codigo_barras', 'nome', 'preco_venda', 'preco_custo']
+                if not all(col in df.columns for col in colunas_necessarias):
+                    flash(f'Arquivo faltando colunas obrigatórias. Verifique o cabeçalho.', 'danger')
+                    return redirect(url_for('produtos_importar'))
+
+                sucessos = 0
+                erros_existentes = 0
+                pulados_vazios = 0
+                
+                # Itera sobre o DataFrame
+                for index, row in df.iterrows():
+                    cod_barras = str(row['codigo_barras'])
+                    
+                    # Pula linha se o código de barras for vazio ou NaN
+                    if not cod_barras or pd.isna(cod_barras) or cod_barras.lower() == 'nan':
+                        pulados_vazios += 1
+                        continue
+
+                    # Verifica se o produto já existe
+                    produto_existente = Produto.query.filter_by(codigo_barras=cod_barras).first()
+                    if produto_existente:
+                        erros_existentes += 1
+                        continue # Pula se o código de barras já existe
+
+                    # Cria o novo produto
+                    novo_produto = Produto(
+                        codigo_barras=cod_barras,
+                        nome=str(row['nome']),
+                        preco_venda=float(row['preco_venda']),
+                        preco_custo=float(row['preco_custo']),
+                        # Colunas opcionais (com valores padrão se não existirem)
+                        estoque_atual=int(row.get('estoque_atual', 0) or 0),
+                        estoque_minimo=int(row.get('estoque_minimo', 0) or 0),
+                        descricao=str(row.get('descricao', '')) if pd.notna(row.get('descricao')) else '',
+                        categoria=str(row.get('categoria', '')) if pd.notna(row.get('categoria')) else '',
+                        ativo=True
+                    )
+                    db.session.add(novo_produto)
+                    sucessos += 1
+                
+                # Se o loop terminar sem erros, commita tudo
+                db.session.commit()
+                flash(f'Importação concluída: {sucessos} produtos cadastrados, {erros_existentes} já existiam, {pulados_vazios} linhas puladas (cód. barras vazio).', 'success')
+                return redirect(url_for('produtos'))
+
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Erro ao processar o arquivo: {e}. Verifique se as colunas e os tipos de dados (ex: números) estão corretos.', 'danger')
+                return redirect(url_for('produtos_importar'))
+
+        else:
+            flash('Formato de arquivo inválido. Por favor, envie um arquivo .xlsx', 'danger')
+            return redirect(request.url)
+
+    # Método GET
+    return render_template('produto_importar.html')
+# =============================================================================
+#           FIM DA NOVA ROTA
+# =============================================================================
+
 # --- FIM GERENCIAMENTO DE PRODUTOS ---
 
 
