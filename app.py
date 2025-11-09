@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from database import db
-from sqlalchemy import func # <-- IMPORTAÇÃO ADICIONADA
+from sqlalchemy import func, or_ # <-- IMPORTAÇÃO ADICIONADA
 from models import Usuario, Produto, Venda, ItemVenda, MovimentoCaixa
 # Importações de data/hora atualizadas (agora usando APENAS HORA LOCAL)
 from datetime import datetime, timedelta, date, time
@@ -1173,6 +1173,58 @@ def api_buscar_produto(codigo):
         'estoque_atual': produto.estoque_atual,
         'imagem_url': imagem_path
     })
+
+# =============================================================================
+#           INÍCIO DA NOVA ROTA (BUSCAR POR NOME - F2)
+# =============================================================================
+@app.route('/api/produtos/buscar')
+@login_required
+def api_buscar_produtos_por_nome():
+    """
+    API para buscar produtos por nome ou código de barras (para o modal F2).
+    """
+    # Verifica se o caixa está aberto
+    caixa_aberto, _ = get_caixa_aberto()
+    if not caixa_aberto:
+        return jsonify({'error': 'Caixa está fechado!'}), 403
+        
+    termo_busca = request.args.get('nome', '')
+    
+    if len(termo_busca) < 2:
+        return jsonify([]) # Retorna lista vazia se a busca for muito curta
+
+    # Cria o filtro (ilike não diferencia maiúsculas/minúsculas)
+    filtro_like = f"%{termo_busca}%"
+    
+    # Busca por nome OU código de barras
+    produtos_encontrados = Produto.query.filter(
+        or_(
+            Produto.nome.ilike(filtro_like),
+            Produto.codigo_barras.ilike(filtro_like)
+        ),
+        Produto.ativo == True
+    ).order_by(Produto.nome).limit(20).all() # Limita a 20 resultados
+
+    # Formata os resultados
+    resultados_json = []
+    for produto in produtos_encontrados:
+        imagem_path = None
+        if produto.imagem_url:
+            imagem_path = url_for('static', filename=produto.imagem_url.replace('static/', '', 1))
+            
+        resultados_json.append({
+            'id': produto.id,
+            'nome': produto.nome,
+            'codigo_barras': produto.codigo_barras,
+            'preco_venda': produto.preco_venda,
+            'estoque_atual': produto.estoque_atual,
+            'imagem_url': imagem_path
+        })
+        
+    return jsonify(resultados_json)
+# =============================================================================
+#           FIM DA NOVA ROTA
+# =============================================================================
 
 @app.route('/vendas/finalizar', methods=['POST'])
 @login_required

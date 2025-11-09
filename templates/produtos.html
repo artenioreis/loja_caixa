@@ -2,10 +2,94 @@
 
 {% block title %}Produtos - Sistema de Caixa{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Estilo para esconder o título de impressão na tela */
+    .print-only {
+        display: none;
+    }
+
+    @media print {
+        /* Esconde tudo que não é para imprimir */
+        #sidebar, #sidebar-toggle-btn, .border-bottom, .no-print {
+            display: none !important;
+        }
+
+        /* Expande o conteúdo principal para a página inteira */
+        #main-content {
+            width: 100% !important;
+            margin-left: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Mostra o título de impressão */
+        .print-only {
+            display: block;
+            text-align: center;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+        
+        /* Estilos da tabela (inspirado em relatorios.html) */
+        body {
+            font-size: 10pt;
+            color: #000;
+            background-color: #fff;
+        }
+        .card {
+            border: none !important;
+            box-shadow: none !important;
+        }
+        .table {
+            color: #000 !important;
+            font-size: 10pt; /* Fonte maior para lista de preço */
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table th, .table td {
+            padding: 5px 8px;
+            border: 1px solid #ccc;
+        }
+        
+        /* ======================================================= */
+        /* INÍCIO DA ALTERAÇÃO (Cabeçalho)           */
+        /* ======================================================= */
+        
+        /* Garante que o cabeçalho da tabela repita em novas páginas */
+        .table thead {
+            display: table-header-group;
+            background-color: #ffffff !important; /* Força fundo branco */
+            color: #000000 !important; /* Força texto preto */
+            border-bottom: 2px solid #000;
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact;
+        }
+
+        /* Garante que os TH (cabeçalhos) também fiquem pretos */
+        .table thead th {
+            color: #000000 !important;
+            background-color: #ffffff !important;
+        }
+        /* ======================================================= */
+        /* FIM DA ALTERAÇÃO                       */
+        /* ======================================================= */
+        
+        /* Remove o badge de "Baixo" e "Ativo" */
+        .badge {
+            display: none;
+        }
+    }
+</style>
+{% endblock %}
+
+
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom no-print">
     <h1 class="h2"><i class="fas fa-boxes"></i> Gerenciar Produtos</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
+    <div class="btn-toolbar mb-2 mb-md-0 no-print">
+        <button class="btn btn-secondary me-2" onclick="window.print()">
+            <i class="fas fa-print"></i> Imprimir Lista
+        </button>
         <a href="{{ url_for('produtos_importar') }}" class="btn btn-info me-2">
             <i class="fas fa-file-excel"></i> Importar Excel
         </a>
@@ -15,6 +99,8 @@
     </div>
 </div>
 
+<h2 class="print-only">Lista de Produtos e Preços</h2>
+
 <div class="card">
     <div class="card-body">
         <div class="table-responsive">
@@ -22,36 +108,36 @@
                 <thead class="table-dark">
                     <tr>
                         <th scope="col">ID</th>
-                        <th scope="col">Cód. Barras</th>
+                        <th scope="col" class="no-print">Cód. Barras</th>
                         <th scope="col">Nome</th>
                         <th scope="col">Preço (R$)</th>
-                        <th scope="col">Estoque</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Ações</th>
+                        <th scope="col" class="no-print">Estoque</th>
+                        <th scope="col" class="no-print">Status</th>
+                        <th scope="col" class="no-print">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for produto in produtos %}
                     <tr>
                         <td>{{ produto.id }}</td>
-                        <td>{{ produto.codigo_barras }}</td>
+                        <td class="no-print">{{ produto.codigo_barras }}</td>
                         <td>{{ produto.nome }}</td>
                         <td>{{ "%.2f"|format(produto.preco_venda) }}</td>
-                        <td>
+                        <td class="no-print">
                             {% if produto.estoque_atual <= produto.estoque_minimo %}
                                 <span class="badge bg-warning text-dark">{{ produto.estoque_atual }} (Baixo)</span>
                             {% else %}
                                 <span class="badge bg-info">{{ produto.estoque_atual }}</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td class="no-print">
                             {% if produto.ativo %}
                                 <span class="badge bg-success">Ativo</span>
                             {% else %}
                                 <span class="badge bg-danger">Inativo</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td class="no-print">
                             <a href="{{ url_for('produtos_editar', id=produto.id) }}" class="btn btn-primary btn-sm"
                                title="Editar">
                                 <i class="fas fa-edit"></i>
