@@ -1,5 +1,5 @@
 @echo off
-cd /d "C:\loja_caixa\app.py"
+cd /d "C:\CAIXA_NSG\app.py"
 call .\.venv\Scripts\Activate 
 python app.py
 pause
