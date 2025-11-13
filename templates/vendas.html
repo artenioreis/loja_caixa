@@ -119,13 +119,7 @@
             <div class="card-body">
                 <h6 class="card-title">Atalhos</h6>
                 <p><kbd>Enter</kbd> - Adicionar Item</p>
-                <!-- ======================================================= -->
-                <!--           INÍCIO DA ALTERAÇÃO (NOVO ATALHO)           -->
-                <!-- ======================================================= -->
                 <p><kbd>F2</kbd> - Buscar Produto por Nome</p>
-                <!-- ======================================================= -->
-                <!--             FIM DA ALTERAÇÃO (NOVO ATALHO)            -->
-                <!-- ======================================================= -->
                 <p><kbd>F6</kbd> - Finalizar Venda</p>
                 <p><kbd>F3</kbd> - Cancelar Venda</p>
             </div>
@@ -151,8 +145,7 @@
                             </tr>
                         </thead>
                         <tbody id="carrinho-tbody">
-                            <!-- Itens do carrinho são inseridos aqui via JS -->
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
             </div>
@@ -178,9 +171,6 @@
     </div>
 </div>
 
-<!-- ======================================================= -->
-<!--           INÍCIO DO NOVO HTML (MODAL DE BUSCA)          -->
-<!-- ======================================================= -->
 <div class="modal fade" id="modalBuscarProduto" tabindex="-1" aria-labelledby="modalBuscarProdutoLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -196,18 +186,11 @@
                 <hr>
                 <div id="lista-resultados-busca">
                     <p class="text-center text-muted">Aguardando digitação (mín. 2 caracteres)...</p>
-                    <!-- Os resultados da busca serão inseridos aqui pelo JavaScript -->
-                </div>
+                    </div>
             </div>
         </div>
     </div>
 </div>
-<!-- ======================================================= -->
-<!--             FIM DO NOVO HTML (MODAL DE BUSCA)           -->
-<!-- ======================================================= -->
-
-
-<!-- Modal Finalizar (Existente) -->
 <div class="modal fade" id="modalFinalizar" tabindex="-1" aria-labelledby="modalFinalizarLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -409,7 +392,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
-     * Redesenha a tabela do carrinho e os totais
+     * Redesenha a tabela do carrinho e os totais (COM INPUT EDITÁVEL)
      */
     function renderizarCarrinho() {
         carrinhoTbody.innerHTML = ''; // Limpa a tabela
@@ -425,7 +408,13 @@ document.addEventListener('DOMContentLoaded', function() {
             tr.innerHTML = `
                 <td>${index + 1}</td>
                 <td>${item.nome}</td>
-                <td>${item.qtd}</td>
+                <td style="width: 100px;">
+                    <input type="number" 
+                           class="form-control form-control-sm text-center" 
+                           value="${item.qtd}" 
+                           min="1" 
+                           onchange="atualizarQuantidadeItem(${item.id}, this.value)">
+                </td>
                 <td>R$ ${item.preco.toFixed(2)}</td>
                 <td>R$ ${item.subtotal.toFixed(2)}</td>
                 <td>
@@ -447,6 +436,32 @@ document.addEventListener('DOMContentLoaded', function() {
         // Habilita/desabilita botão de finalizar
         btnFinalizar.disabled = carrinho.length === 0;
     }
+
+    /**
+     * Atualiza a quantidade de um item já existente no carrinho
+     */
+    window.atualizarQuantidadeItem = function(produtoId, novaQuantidade) {
+        const qtd = parseInt(novaQuantidade);
+        
+        // Validação básica
+        if (isNaN(qtd) || qtd <= 0) {
+            alert("A quantidade deve ser maior que zero.");
+            renderizarCarrinho(); // Restaura o valor antigo na tela
+            return;
+        }
+
+        // Encontra o item no array do carrinho
+        const item = carrinho.find(item => item.id === produtoId);
+
+        if (item) {
+            // Atualiza quantidade e recalcula subtotal
+            item.qtd = qtd;
+            item.subtotal = item.preco * item.qtd;
+            
+            // Atualiza a interface
+            renderizarCarrinho();
+        }
+    };
     
     /**
      * Remove um item do carrinho

@@ -1,7 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from database import db
-from sqlalchemy import func, or_ # <-- IMPORTAÇÃO ADICIONADA
+from sqlalchemy import func, or_ 
 from models import Usuario, Produto, Venda, ItemVenda, MovimentoCaixa
 # Importações de data/hora atualizadas (agora usando APENAS HORA LOCAL)
 from datetime import datetime, timedelta, date, time
@@ -305,6 +305,41 @@ def dashboard():
 # =============================================================================
 #           FIM DA ROTA MODIFICADA (DASHBOARD)
 # =============================================================================
+
+# =============================================================================
+#           INÍCIO DA NOVA ROTA (BACKUP DATABASE)
+# =============================================================================
+@app.route('/backup_database')
+@login_required
+def backup_database():
+    """
+    Permite que o administrador baixe o arquivo do banco de dados.
+    """
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('dashboard'))
+
+    try:
+        # O banco de dados está na pasta 'instance'
+        db_path = os.path.join(app.instance_path, 'loja.db')
+        
+        if not os.path.exists(db_path):
+            flash('Erro: Arquivo do banco de dados não encontrado.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        # Gera um nome de arquivo com a data
+        data_hoje = datetime.now().strftime('%Y-%m-%d_%H%M')
+        nome_arquivo_backup = f'backup_loja_{data_hoje}.db'
+
+        return send_file(db_path, as_attachment=True, download_name=nome_arquivo_backup)
+
+    except Exception as e:
+        flash(f'Erro ao gerar o backup: {e}', 'danger')
+        return redirect(url_for('dashboard'))
+# =============================================================================
+#           FIM DA NOVA ROTA (BACKUP DATABASE)
+# =============================================================================
+
 
 # =============================================================================
 # ROTAS DO MÓDULO DE CAIXA
@@ -904,13 +939,31 @@ def relatorios():
         db.func.count(Venda.id).label('num_vendas'),
         db.func.sum(Venda.valor_total).label('total_vendido')
     ).filter(
-        Venda.status == 'finalizada',
+        # NÃO FILTRA POR STATUS AQUI, pois queremos contar canceladas
+        Venda.data_venda.between(data_inicio, data_fim)
+    )
+    
+    # Query separada para o TOTAL VENDIDO (apenas finalizadas)
+    query_total_vendido = db.session.query(
+        db.func.sum(Venda.valor_total).label('total_vendido')
+    ).filter(
+        Venda.status == 'finalizada', # <-- Apenas finalizadas
+        Venda.data_venda.between(data_inicio, data_fim)
+    )
+
+    # Query separada para NÚMERO DE VENDAS (apenas finalizadas)
+    query_num_vendas = db.session.query(
+        db.func.count(Venda.id).label('num_vendas')
+    ).filter(
+        Venda.status == 'finalizada', # <-- Apenas finalizadas
         Venda.data_venda.between(data_inicio, data_fim)
     )
     
     # Aplica filtro de caixa se um específico foi selecionado
     if caixa_selecionado > 0:
         query_sumario = query_sumario.filter(Venda.usuario_id == caixa_selecionado)
+        query_total_vendido = query_total_vendido.filter(Venda.usuario_id == caixa_selecionado)
+        query_num_vendas = query_num_vendas.filter(Venda.usuario_id == caixa_selecionado)
         usuario_filtro = db.session.get(Usuario, caixa_selecionado)
         if usuario_filtro:
             nome_filtro = f"Caixa: {usuario_filtro.nome}"
@@ -918,15 +971,20 @@ def relatorios():
     # Aplica filtro de forma de pagamento
     if forma_pgto_selecionada != 'todos':
         query_sumario = query_sumario.filter(Venda.forma_pagamento == forma_pgto_selecionada)
+        query_total_vendido = query_total_vendido.filter(Venda.forma_pagamento == forma_pgto_selecionada)
+        query_num_vendas = query_num_vendas.filter(Venda.forma_pagamento == forma_pgto_selecionada)
 
+    # Executa as queries
     sumario = query_sumario.first()
+    total_vendido_obj = query_total_vendido.first()
+    num_vendas_obj = query_num_vendas.first()
 
     # Cálculo do Ticket Médio
-    total_vendido = sumario.total_vendido or 0
-    num_vendas = sumario.num_vendas or 0
+    total_vendido = total_vendido_obj.total_vendido or 0
+    num_vendas = num_vendas_obj.num_vendas or 0
     ticket_medio = (total_vendido / num_vendas) if num_vendas > 0 else 0
 
-    # --- 2. Consulta de Produtos Mais Vendidos ---
+    # --- 2. Consulta de Produtos Mais Vendidos (APENAS VENDAS FINALIZADAS) ---
     query_produtos = db.session.query(
         Produto.nome,
         Produto.codigo_barras,
@@ -935,7 +993,7 @@ def relatorios():
     ).join(ItemVenda, ItemVenda.produto_id == Produto.id)\
      .join(Venda, Venda.id == ItemVenda.venda_id)\
      .filter(
-        Venda.status == 'finalizada',
+        Venda.status == 'finalizada', # <-- APENAS FINALIZADAS
         Venda.data_venda.between(data_inicio, data_fim)
      )
     
@@ -952,13 +1010,13 @@ def relatorios():
                                       .limit(10)\
                                       .all()
 
-    # --- 3. Consulta de Itens Vendidos (Detalhe) ---
+    # --- 3. Consulta de Itens Vendidos (Detalhe) (TODOS OS STATUS) ---
     query_itens = db.session.query(
         ItemVenda
     ).join(Venda, Venda.id == ItemVenda.venda_id)\
      .join(Produto, Produto.id == ItemVenda.produto_id)\
      .filter(
-        Venda.status == 'finalizada',
+        # Sem filtro de status aqui para mostrar canceladas
         Venda.data_venda.between(data_inicio, data_fim)
      )
     
@@ -976,8 +1034,8 @@ def relatorios():
     return render_template('relatorios.html',
                          data_inicio=data_inicio_str,
                          data_fim=data_fim_str,
-                         total_vendido=total_vendido,
-                         num_vendas=num_vendas,
+                         total_vendido=total_vendido, # Total apenas de vendas finalizadas
+                         num_vendas=num_vendas, # Número apenas de vendas finalizadas
                          ticket_medio=ticket_medio,
                          produtos_vendidos=produtos_vendidos,
                          itens_vendidos_detalhe=itens_vendidos_detalhe,
@@ -1061,7 +1119,7 @@ def exportar_relatorio():
     ).join(Venda, Venda.id == ItemVenda.venda_id)\
      .join(Produto, Produto.id == ItemVenda.produto_id)\
      .filter(
-        Venda.status == 'finalizada',
+        # Exporta todos os status (finalizada e cancelada)
         Venda.data_venda.between(data_inicio, data_fim)
      )
     
@@ -1078,6 +1136,7 @@ def exportar_relatorio():
         dados_para_planilha.append({
             'ID Venda': item.venda.id,
             'Data Venda': item.venda.data_venda.strftime('%Y-%m-%d %H:%M:%S'), # Agora está em hora local
+            'Status': item.venda.status.title(), # Adiciona o status
             'Operador': item.venda.operador.nome,
             'Forma Pgto': item.venda.forma_pagamento.title(),
             'ID Produto': item.produto.id,
@@ -1226,6 +1285,9 @@ def api_buscar_produtos_por_nome():
 #           FIM DA NOVA ROTA
 # =============================================================================
 
+# =============================================================================
+#           INÍCIO DA ROTA ALTERADA (SEQUENCIAL 1, 2, 3, 4)
+# =============================================================================
 @app.route('/vendas/finalizar', methods=['POST'])
 @login_required
 def finalizar_venda():
@@ -1250,29 +1312,21 @@ def finalizar_venda():
         valor_total_venda = 0
         itens_venda_db = []
         
-        # ===========================================================
-        #           CORREÇÃO DE FUSO (Usar HORA LOCAL)
-        # ===========================================================
-        # Gera o número da venda (usando timestamp LOCAL para consistência)
-        numero_venda = f"V{int(datetime.now().timestamp())}" # CORRIGIDO (era utcnow)
-        # ===========================================================
-        
-        # --- INÍCIO DA CORREÇÃO (NoneType para float) ---
         # Pega o valor_pago do JSON
         valor_pago_json = data.get('valor_pago')
         # Garante que não seja NoneType antes de converter. Se for None, usa 0.
         valor_pago_float = float(valor_pago_json or 0)
 
-        # Cria a Venda principal (o model usará datetime.now() por padrão)
+        # Cria a Venda principal 
+        # ATENÇÃO: Iniciamos com numero_venda "PENDENTE" para preencher depois com o ID sequencial
         nova_venda = Venda(
-            numero_venda=numero_venda,
+            numero_venda="PENDENTE", 
             valor_total=0, # Será calculado
             valor_pago=valor_pago_float, # Usa o valor seguro
             forma_pagamento=data.get('forma_pagamento', 'dinheiro'),
             status='finalizada',
             usuario_id=current_user.id
         )
-        # --- FIM DA CORREÇÃO ---
         
         # Loop nos itens do carrinho para validar estoque e calcular total
         for item_json in data['itens']:
@@ -1314,11 +1368,20 @@ def finalizar_venda():
             nova_venda.valor_pago = valor_total_venda # Garante que valor pago é o total
             nova_venda.troco = 0
 
-        # Adiciona os itens à venda (o backref cuida do venda_id)
+        # Adiciona os itens à venda
         nova_venda.itens = itens_venda_db
         
-        # Salva tudo no banco
+        # Adiciona à sessão
         db.session.add(nova_venda)
+        
+        # --- MÁGICA DO SEQUENCIAL ---
+        # O flush envia os dados para o banco para gerar o ID, mas sem commitar (sem fechar a transação)
+        db.session.flush() 
+        
+        # Agora que temos o ID, atualizamos o numero_venda com o próprio ID (1, 2, 3...)
+        nova_venda.numero_venda = str(nova_venda.id) 
+        
+        # Salva tudo no banco definitivamente
         db.session.commit()
         
         return jsonify({
@@ -1330,6 +1393,9 @@ def finalizar_venda():
     except Exception as e:
         db.session.rollback() # Desfaz qualquer mudança no banco em caso de erro
         return jsonify({'error': str(e)}), 400
+# =============================================================================
+#           FIM DA ROTA ALTERADA
+# =============================================================================
 
 # =============================================================================
 #           INÍCIO DA NOVA ROTA (CUPOM FECHAMENTO)
@@ -1399,6 +1465,118 @@ def cupom_fechamento():
 # =============================================================================
 #           FIM DA NOVA ROTA (CUPOM FECHAMENTO)
 # =============================================================================
+
+# =============================================================================
+#           INÍCIO DA NOVA ROTA (EDITAR PAGAMENTO)
+# =============================================================================
+@app.route('/vendas/editar_pagamento/<int:venda_id>', methods=['POST'])
+@login_required
+def editar_pagamento(venda_id):
+    """
+    Rota para corrigir a forma de pagamento de uma venda já finalizada.
+    Apenas administradores podem realizar essa ação.
+    """
+    if not current_user.is_admin():
+        flash('Acesso negado: Apenas administradores podem alterar vendas.', 'danger')
+        return redirect(url_for('relatorios'))
+
+    venda = db.session.get(Venda, venda_id)
+    
+    if not venda:
+        flash('Venda não encontrada.', 'danger')
+        return redirect(url_for('relatorios'))
+    
+    # Impede a edição de vendas canceladas
+    if venda.status == 'cancelada':
+        flash('Não é possível editar uma venda cancelada.', 'warning')
+        return redirect(url_for('relatorios', **request.args))
+
+    nova_forma = request.form.get('nova_forma_pagamento')
+    
+    if nova_forma in ['dinheiro', 'cartao', 'pix']:
+        forma_antiga = venda.forma_pagamento
+        venda.forma_pagamento = nova_forma
+        
+        # Ajuste de consistência financeira
+        # Se alterado para algo que não é dinheiro, zera o troco e iguala o valor pago
+        if nova_forma != 'dinheiro':
+            venda.troco = 0.0
+            venda.valor_pago = venda.valor_total
+        # Se alterado DE cartão/pix PARA dinheiro, assume-se pagamento exato para evitar erro de caixa
+        elif forma_antiga != 'dinheiro' and nova_forma == 'dinheiro':
+            venda.troco = 0.0
+            venda.valor_pago = venda.valor_total
+
+        db.session.commit()
+        flash(f'Venda #{venda.numero_venda} alterada de {forma_antiga} para {nova_forma}.', 'success')
+    else:
+        flash('Forma de pagamento inválida.', 'danger')
+
+    # Passa os argumentos de filtro de volta para a URL do relatorio
+    return redirect(url_for('relatorios', 
+                          inicio=request.args.get('inicio'),
+                          fim=request.args.get('fim'),
+                          caixa_id=request.args.get('caixa_id'),
+                          forma_pgto=request.args.get('forma_pgto')
+                          ))
+# =============================================================================
+#           FIM DA NOVA ROTA (EDITAR PAGAMENTO)
+# =============================================================================
+
+# =============================================================================
+#           INÍCIO DA NOVA ROTA (CANCELAR VENDA)
+# =============================================================================
+@app.route('/vendas/cancelar/<int:venda_id>', methods=['POST'])
+@login_required
+def vendas_cancelar(venda_id):
+    """
+    Rota para cancelar uma venda finalizada (estorno).
+    Apenas administradores podem realizar essa ação.
+    """
+    if not current_user.is_admin():
+        flash('Acesso negado: Apenas administradores podem cancelar vendas.', 'danger')
+        return redirect(url_for('relatorios'))
+
+    venda = db.session.get(Venda, venda_id)
+
+    if not venda:
+        flash('Venda não encontrada.', 'danger')
+        return redirect(url_for('relatorios', **request.args))
+    
+    if venda.status == 'cancelada':
+        flash('Esta venda já foi cancelada.', 'info')
+        return redirect(url_for('relatorios', **request.args))
+
+    try:
+        # Inicia a transação
+        
+        # 1. Devolve os itens ao estoque
+        for item in venda.itens:
+            produto = item.produto # Carrega o produto associado
+            if produto:
+                produto.estoque_atual += item.quantidade
+        
+        # 2. Marca a venda como "cancelada"
+        venda.status = 'cancelada'
+        
+        db.session.commit()
+        flash(f'Venda #{venda.numero_venda} foi cancelada com sucesso. O estoque foi devolvido.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao cancelar a venda: {str(e)}', 'danger')
+    
+    # Redireciona de volta para a tela de relatórios com os filtros
+    return redirect(url_for('relatorios', 
+                          inicio=request.args.get('inicio'),
+                          fim=request.args.get('fim'),
+                          caixa_id=request.args.get('caixa_id'),
+                          forma_pgto=request.args.get('forma_pgto')
+                          ))
+# =============================================================================
+#           FIM DA NOVA ROTA (CANCELAR VENDA)
+# =============================================================================
+
 
 # =============================================================================
 # INICIALIZAÇÃO DO BANCO DE DADOS

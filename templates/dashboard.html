@@ -136,6 +136,12 @@ Caixa {% if caixa_aberto %}Aberto{% else %}Fechado{% endif %}
                 <a href="{{ url_for('relatorios') }}" class="btn btn-outline-info">
                     <i class="fas fa-chart-bar"></i> Ver Relatórios
                 </a>
+                
+                <!-- BOTÃO DE BACKUP ADICIONADO DE VOLTA -->
+                <a href="{{ url_for('backup_database') }}" class="btn btn-outline-danger" 
+                   onclick="return confirm('Isso fará o download de um backup completo do banco de dados. Deseja continuar?');">
+                    <i class="fas fa-database"></i> Backup do Banco de Dados
+                </a>
                 {% endif %}
             </div>
         </div>
