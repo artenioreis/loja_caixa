@@ -9,8 +9,11 @@
     /* ======================================================= */
 
     /* 1. ESTILO PADRÃO (PARA TODAS AS TELAS) */
-    body {
-        background-image: url('https://wallpapers.com/images/hd/sky-blue-background-klsgg0p0wj4pd0cg.jpg');
+    
+        /*background-image: url('https://wallpapers.com/images/hd/sky-blue-background-klsgg0p0wj4pd0cg.jpg');*/
+        body {
+        /* Agora carrega da pasta local, funciona sem internet */
+        background-image: url("{{ url_for('static', filename='images/fundo_login.jpg') }}");
         
         /* 'cover': Garante que a imagem cubra a tela inteira */
         background-size: cover; 
