@@ -103,6 +103,11 @@
                                 <i class="fas fa-chart-bar"></i> Relatórios
                             </a>
                         </li>
+                        <li class="nav-item">
+                        <a class="nav-link {% if 'relatorio_cupons' in request.path %}active{% endif %}" href="{{ url_for('relatorio_cupons') }}">
+                            <i class="fas fa-file-invoice-dollar"></i> Relatório (Cupons)
+                        </a>
+                    </li>
                         {% endif %}
                         
                         <li class="nav-item">

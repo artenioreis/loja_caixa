@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <h2><i class="fas fa-file-invoice-dollar"></i> Relatório de Cupons (Vendas Finalizadas)</h2>
+    <p>Visualize as vendas individuais (cupons) finalizadas no período.</p>
+
+    <hr>
+
+    <form method="GET" action="{{ url_for('relatorio_cupons') }}" class="mb-4 card card-body shadow-sm">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="inicio" class="form-label">Data Início</label>
+                <input type="date" class="form-control" id="inicio" name="inicio" value="{{ data_inicio }}">
+            </div>
+            
+            <div class="col-md-3">
+                <label for="fim" class="form-label">Data Fim</label>
+                <input type="date" class="form-control" id="fim" name="fim" value="{{ data_fim }}">
+            </div>
+
+            <div class="col-md-2">
+                <label for="caixa_id" class="form-label">Operador</label>
+                <select id="caixa_id" name="caixa_id" class="form-select">
+                    <option value="0" {% if caixa_selecionado == 0 %}selected{% endif %}>Todos os Caixas</option>
+                    {% for caixa in caixas %}
+                        <option value="{{ caixa.id }}" {% if caixa_selecionado == caixa.id %}selected{% endif %}>
+                            {{ caixa.nome }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label for="forma_pgto" class="form-label">Forma Pgto.</label>
+                <select id="forma_pgto" name="forma_pgto" class="form-select">
+                    <option value="todos" {% if forma_pgto_selecionada == 'todos' %}selected{% endif %}>Todas</option>
+                    <option value="dinheiro" {% if forma_pgto_selecionada == 'dinheiro' %}selected{% endif %}>Dinheiro</option>
+                    <option value="cartao" {% if forma_pgto_selecionada == 'cartao' %}selected{% endif %}>Cartão</option>
+                    <option value="pix" {% if forma_pgto_selecionada == 'pix' %}selected{% endif %}>Pix</option>
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter"></i> Filtrar
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <strong>Filtro Atual:</strong> {{ nome_filtro }} | {{ data_inicio }} a {{ data_fim }} | Pgto: {{ forma_pgto_selecionada.title() }}
+        </div>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th scope="col">Nº Cupom</th>
+                        <th scope="col">Data/Hora</th>
+                        <th scope="col">Total (R$)</th>
+                        <th scope="col">Forma Pgto.</th>
+                        <th scope="col">Operador</th>
+                        <th scope="col">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for venda in vendas_lista %}
+                    <tr>
+                        <td><strong>#{{ venda.numero_venda }}</strong></td>
+                        <td>{{ venda.data_venda.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                        <td>R$ {{ "%.2f"|format(venda.valor_total) }}</td>
+                        <td>
+                            {% if venda.forma_pagamento == 'dinheiro' %}
+                                <span class="badge bg-success">Dinheiro</span>
+                            {% elif venda.forma_pagamento == 'cartao' %}
+                                <span class="badge bg-primary">Cartão</span>
+                            {% elif venda.forma_pagamento == 'pix' %}
+                                <span class="badge bg-info">Pix</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ venda.operador.nome }}</td>
+                        <td>
+                            <a href="{{ url_for('cupom_venda', venda_id=venda.id) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Ver Cupom">
+                                <i class="fas fa-receipt"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center">Nenhum cupom encontrado para os filtros selecionados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-group-divider">
+                    <tr class="table-light">
+                        <td colspan="2"><strong>TOTAL DOS CUPONS ({{ vendas_lista|length }} cupons)</strong></td>
+                        <td colspan="4">
+                            <h4 class="mb-0">
+                                <strong>R$ {{ "%.2f"|format(total_geral_cupons) }}</strong>
+                            </h4>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

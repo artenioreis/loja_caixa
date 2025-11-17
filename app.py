@@ -1045,6 +1045,95 @@ def relatorios():
                          forma_pgto_selecionada=forma_pgto_selecionada # Envia a forma de pgto
                          )
 
+# =============================================================================
+#           INÍCIO DA NOVA ROTA (RELATÓRIO DE CUPONS)
+# =============================================================================
+@app.route('/relatorio_cupons')
+@login_required
+def relatorio_cupons():
+    """Rota para relatório de cupons/vendas individuais (Apenas Admin)"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('vendas'))
+
+    # --- 1. Lógica de Filtro de Data (copiada de /relatorios) ---
+    data_inicio_str = request.args.get('inicio')
+    data_fim_str = request.args.get('fim')
+    
+    # --- 2. Lógica de Filtro de Caixa (Usuário) (copiada de /relatorios) ---
+    caixa_id_str = request.args.get('caixa_id', '0') # '0' significa "Todos"
+    caixa_selecionado = 0
+    try:
+        caixa_selecionado = int(caixa_id_str)
+    except ValueError:
+        caixa_selecionado = 0 
+
+    # --- 3. Lógica de Filtro de Forma de Pagamento (copiada de /relatorios) ---
+    forma_pgto_selecionada = request.args.get('forma_pgto', 'todos') # 'todos' é o padrão
+
+    # --- 4. Define o padrão (últimos 7 dias) (copiado de /relatorios) ---
+    hoje_local = date.today()
+    if not data_inicio_str:
+        data_inicio_str = (hoje_local - timedelta(days=6)).strftime('%Y-%m-%d')
+    if not data_fim_str:
+        data_fim_str = hoje_local.strftime('%Y-%m-%d')
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+    except ValueError:
+        flash('Formato de data inválido.', 'danger')
+        data_fim = datetime.now().replace(hour=23, minute=59, second=59)
+        data_inicio = (data_fim - timedelta(days=6)).replace(hour=0, minute=0, second=0)
+        data_inicio_str = data_inicio.strftime('%Y-%m-%d')
+        data_fim_str = data_fim.strftime('%Y-%m-%d')
+
+
+    # --- 5. Busca caixas e nome do filtro (copiado de /relatorios) ---
+    caixas = Usuario.query.order_by(Usuario.nome).all()
+    nome_filtro = "Geral (Todos os Caixas)"
+
+    # --- 6. Consulta Principal (Vendas/Cupons) ---
+    # Começamos com a query base, já filtrando por status 'finalizada' e datas
+    base_query = db.session.query(Venda).join(Usuario).filter(
+        Venda.status == 'finalizada',
+        Venda.data_venda.between(data_inicio, data_fim)
+    )
+
+    # Aplica filtro de caixa se um específico foi selecionado
+    if caixa_selecionado > 0:
+        base_query = base_query.filter(Venda.usuario_id == caixa_selecionado)
+        usuario_filtro = db.session.get(Usuario, caixa_selecionado)
+        if usuario_filtro:
+            nome_filtro = f"Caixa: {usuario_filtro.nome}"
+
+    # Aplica filtro de forma de pagamento
+    if forma_pgto_selecionada != 'todos':
+        base_query = base_query.filter(Venda.forma_pagamento == forma_pgto_selecionada)
+
+    # Executa a query para obter a lista de vendas (cupons)
+    vendas_lista = base_query.order_by(Venda.data_venda.desc()).all()
+    
+    # Calcula o total geral dos cupons filtrados
+    # (Usamos a 'base_query' para somar apenas os valores filtrados)
+    total_geral_cupons = base_query.with_entities(
+        func.sum(Venda.valor_total)
+    ).scalar() or 0.0
+
+    return render_template('relatorio_cupons.html',
+                         vendas_lista=vendas_lista,
+                         total_geral_cupons=total_geral_cupons,
+                         data_inicio=data_inicio_str,
+                         data_fim=data_fim_str,
+                         caixas=caixas, 
+                         caixa_selecionado=caixa_selecionado,
+                         nome_filtro=nome_filtro,
+                         forma_pgto_selecionada=forma_pgto_selecionada
+                         )
+# =============================================================================
+#           FIM DA NOVA ROTA
+# =============================================================================
+
 
 # --- NOVA ROTA PARA O CUPOM ---
 @app.route('/venda/cupom/<int:venda_id>')
