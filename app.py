@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
+# CORREÇÃO: LoginManager deve ser importado
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from database import db
 from sqlalchemy import func, or_ 
-from models import Usuario, Produto, Venda, ItemVenda, MovimentoCaixa
+# Importação dos modelos atualizados (incluindo PagamentoVenda)
+from models import Usuario, Produto, Venda, ItemVenda, MovimentoCaixa, PagamentoVenda
 # Importações de data/hora atualizadas (agora usando APENAS HORA LOCAL)
 from datetime import datetime, timedelta, date, time
 import os
@@ -163,9 +165,6 @@ def inject_context():
     if current_user.is_authenticated:
         caixa_aberto, movimento_atual = get_caixa_aberto()
     
-    # ===========================================================
-    #           CORREÇÃO DE FUSO (VISUAL)
-    # ===========================================================
     # Voltando para datetime.now() para usar a HORA LOCAL
     return dict(
         caixa_aberto=caixa_aberto,
@@ -179,7 +178,7 @@ def inject_context():
 # =============================================================================
 
 # =============================================================================
-#           INÍCIO DA ROTA MODIFICADA (DASHBOARD)
+#           INÍCIO DA ROTA MODIFICADA (DASHBOARD) - AJUSTE PARA MULTIPAGAMENTO
 # =============================================================================
 @app.route('/dashboard')
 @login_required
@@ -191,19 +190,17 @@ def dashboard():
         flash('Acesso não autorizado!', 'danger')
         return redirect(url_for('vendas'))
 
-    # ===========================================================
-    #           CORREÇÃO DE FUSO (Usar HORA LOCAL)
-    # ===========================================================
     # Estatísticas para o dashboard
-    hoje = date.today() # CORRIGIDO (era datetime.utcnow().date())
+    hoje = date.today()
     
-    # Total vendido hoje
+    # Total vendido hoje (Valor total da Venda é uma property calculada em models.py)
     # Usando func.date para comparar apenas a data
     vendas_hoje = Venda.query.filter(
         db.func.date(Venda.data_venda) == hoje,
         Venda.status == 'finalizada'
     ).all()
-    total_hoje = sum(venda.valor_total for venda in vendas_hoje)
+    # Usa a propriedade 'valor_total' do modelo Venda
+    total_hoje = sum(venda.valor_total for venda in vendas_hoje) 
     
     # Quantidade de produtos com estoque baixo
     estoque_baixo = Produto.query.filter(
@@ -218,15 +215,11 @@ def dashboard():
     caixa_aberto, movimento_atual = get_caixa_aberto()
     
     # Buscar caixas esquecidos
-    # (Compara a data de abertura local com o início do dia local)
-    hoje_meia_noite_local = datetime.combine(hoje, time.min) # CORRIGIDO
+    hoje_meia_noite_local = datetime.combine(hoje, time.min) 
     caixas_esquecidos = MovimentoCaixa.query.filter(
         MovimentoCaixa.status == 'aberto',
         MovimentoCaixa.data_abertura < hoje_meia_noite_local
     ).order_by(MovimentoCaixa.data_abertura.desc()).all()
-    # ===========================================================
-    #           FIM DA CORREÇÃO DE FUSO
-    # ===========================================================
     
     # Status de todos os caixas
     status_caixas = []
@@ -247,22 +240,18 @@ def dashboard():
             # Se o último movimento está fechado, calcula a diferença
             if ultimo_movimento.status == 'fechado':
                 
-                # 1. Busca APENAS as vendas em DINHEIRO daquele período
-                #    (Agora comparando hora local com hora local)
-                vendas_dinheiro = Venda.query.filter(
-                    Venda.data_venda >= ultimo_movimento.data_abertura,
-                    Venda.data_venda <= ultimo_movimento.data_fechamento, 
+                # 1. Soma APENAS os pagamentos em DINHEIRO daquele período usando o novo modelo
+                total_dinheiro_movimento = db.session.query(func.sum(PagamentoVenda.valor)).join(Venda).filter(
                     Venda.usuario_id == op.id,
                     Venda.status == 'finalizada',
-                    Venda.forma_pagamento == 'dinheiro'
-                ).all()
+                    PagamentoVenda.forma_pagamento == 'dinheiro',
+                    PagamentoVenda.data_pagamento >= ultimo_movimento.data_abertura,
+                    PagamentoVenda.data_pagamento <= ultimo_movimento.data_fechamento 
+                ).scalar() or 0.0
                 
-                # 2. Soma apenas o total em DINHEIRO
-                total_vendas_dinheiro = sum(venda.valor_total for venda in vendas_dinheiro)
-                
-                # 3. Calcula o saldo esperado (Dinheiro)
-                #    (Saldo Inicial + Vendas em Dinheiro)
-                saldo_esperado = (ultimo_movimento.saldo_inicial or 0) + total_vendas_dinheiro
+                # 2. Calcula o saldo esperado (Dinheiro)
+                #    (Saldo Inicial + Pagamentos em Dinheiro)
+                saldo_esperado = (ultimo_movimento.saldo_inicial or 0) + total_dinheiro_movimento
 
                 # Pega o saldo que foi informado no fechamento
                 saldo_final_informado = ultimo_movimento.saldo_final or 0
@@ -306,9 +295,6 @@ def dashboard():
 #           FIM DA ROTA MODIFICADA (DASHBOARD)
 # =============================================================================
 
-# =============================================================================
-#           INÍCIO DA NOVA ROTA (BACKUP DATABASE)
-# =============================================================================
 @app.route('/backup_database')
 @login_required
 def backup_database():
@@ -336,9 +322,6 @@ def backup_database():
     except Exception as e:
         flash(f'Erro ao gerar o backup: {e}', 'danger')
         return redirect(url_for('dashboard'))
-# =============================================================================
-#           FIM DA NOVA ROTA (BACKUP DATABASE)
-# =============================================================================
 
 
 # =============================================================================
@@ -378,7 +361,7 @@ def abrir_caixa():
 
 
 # =============================================================================
-#           INÍCIO DA ROTA MODIFICADA (FECHAR CAIXA)
+#           INÍCIO DA ROTA MODIFICADA (FECHAR CAIXA) - AJUSTE PARA MULTIPAGAMENTO
 # =============================================================================
 @app.route('/caixa/fechar', methods=['GET', 'POST'])
 @login_required
@@ -400,24 +383,18 @@ def fechar_caixa():
     if request.method == 'POST':
         saldo_final = float(request.form.get('saldo_final', 0))
         
-        # ===========================================================
-        #           CORREÇÃO DE FUSO (Usar HORA LOCAL)
-        # ===========================================================
         # 1. Define o momento exato do fechamento UMA VEZ (em HORA LOCAL)
-        momento_fechamento = datetime.now() # CORRIGIDO (era utcnow)
+        momento_fechamento = datetime.now() 
         
-        # 2. Calcula total de vendas do período ATÉ O MOMENTO DO FECHAMENTO (LOCAL)
+        # 2. Calcula total de vendas para a mensagem (opcional)
         vendas_periodo_post = Venda.query.filter(
             Venda.data_venda >= movimento_atual.data_abertura, 
-            Venda.data_venda <= momento_fechamento, # <-- Correto
+            Venda.data_venda <= momento_fechamento, 
             Venda.usuario_id == current_user.id,
             Venda.status == 'finalizada'
         ).all()
-        # ===========================================================
-        #           FIM DA CORREÇÃO DE FUSO
-        # ===========================================================
         
-        # (O total de vendas para o flash message pode ser o geral)
+        # O valor total da venda agora é uma propriedade calculada
         total_vendas_geral = sum(venda.valor_total for venda in vendas_periodo_post)
         
         # Atualiza movimento de caixa
@@ -434,30 +411,28 @@ def fechar_caixa():
             return redirect(url_for('vendas'))
     
     # --- LÓGICA DO MÉTODO GET (Apenas para exibir a tela) ---
-    # Calcula estatísticas para exibir no fechamento
     
-    # Query base das vendas no período (abertura local até agora local)
+    # 1. Query base das vendas no período (abertura local até agora local)
     query_vendas = Venda.query.filter(
-        Venda.data_venda >= movimento_atual.data_abertura,
-        Venda.data_venda <= datetime.now(), # Filtra até o momento atual
         Venda.usuario_id == current_user.id,
-        Venda.status == 'finalizada'
+        Venda.status == 'finalizada',
+        Venda.data_venda >= movimento_atual.data_abertura,
+        Venda.data_venda <= datetime.now() 
     )
     
-    # 1. Total de Vendas (para o JavaScript e contagem)
-    vendas_periodo_get = query_vendas.all()
-    total_vendas_count = len(vendas_periodo_get)
+    # 2. Total de Vendas (para contagem)
+    total_vendas_count = query_vendas.count()
 
-    # 2. Agrupa os totais por forma de pagamento
+    # 3. Agrupa os totais por forma de pagamento (usando PagamentoVenda)
     vendas_agrupadas = db.session.query(
-        Venda.forma_pagamento,
-        func.sum(Venda.valor_total).label('total')
-    ).filter(
-        Venda.data_venda >= movimento_atual.data_abertura,
-        Venda.data_venda <= datetime.now(), # Filtra até o momento atual
+        PagamentoVenda.forma_pagamento,
+        func.sum(PagamentoVenda.valor).label('total')
+    ).join(Venda).filter(
         Venda.usuario_id == current_user.id,
-        Venda.status == 'finalizada'
-    ).group_by(Venda.forma_pagamento).all()
+        Venda.status == 'finalizada',
+        PagamentoVenda.data_pagamento >= movimento_atual.data_abertura,
+        PagamentoVenda.data_pagamento <= datetime.now()
+    ).group_by(PagamentoVenda.forma_pagamento).all()
 
     # Prepara o dicionário de totais
     totais = {
@@ -468,19 +443,30 @@ def fechar_caixa():
     }
     
     for forma, total in vendas_agrupadas:
-        if forma in totais:
-            totais[forma] = float(total or 0.0)
+        # Normaliza a chave, garantindo que outras formas sejam incluídas se existirem
+        forma_str = str(forma).lower()
+        totais[forma_str] = float(total or 0.0)
         totais['total_geral'] += float(total or 0.0)
 
     # O 'saldo_esperado' é o (Saldo Inicial + Vendas em Dinheiro)
-    # O 'total_vendas' (para o script JS) deve ser apenas o de dinheiro
-    saldo_esperado_dinheiro = movimento_atual.saldo_inicial + totais['dinheiro']
+    saldo_esperado_dinheiro = (movimento_atual.saldo_inicial or 0) + totais['dinheiro']
     
+    # Certifica-se que todos os totais importantes existem para o template
+    default_totais = {
+        'dinheiro': 0.0,
+        'cartao': 0.0,
+        'pix': 0.0
+    }
+    # Atualiza com os valores calculados, mantendo as chaves necessárias
+    for key in default_totais.keys():
+        default_totais[key] = totais.get(key, 0.0)
+    default_totais['total_geral'] = totais['total_geral']
+
     return render_template('fechar_caixa.html',
                          caixa_aberto=movimento_atual,
-                         totais=totais, # Enviando o dict de totais
+                         totais=totais, # Enviando o dict de totais COMPLETO
                          saldo_esperado_dinheiro=saldo_esperado_dinheiro,
-                         total_vendas_dinheiro=totais['dinheiro'], # Para o JS
+                         total_vendas_dinheiro=totais['dinheiro'], 
                          total_vendas_count=total_vendas_count)
 # =============================================================================
 #           FIM DA ROTA MODIFICADA (FECHAR CAIXA)
@@ -682,7 +668,7 @@ def produtos_importar():
                     # Pula linha se o código de barras for vazio ou NaN
                     if not cod_barras or pd.isna(cod_barras) or cod_barras.lower() == 'nan':
                         pulados_vazios += 1
-                        continue
+                        continue # Pula para a próxima iteração
 
                     # Verifica se o produto já existe
                     produto_existente = Produto.query.filter_by(codigo_barras=cod_barras).first()
@@ -875,8 +861,33 @@ def vendas():
     return render_template('vendas.html')
 
 # =============================================================================
-# ROTA DE RELATÓRIOS (ATUALIZADA)
+# ROTA DE RELATÓRIOS (ATUALIZADA) - AJUSTE PARA FILTRO DE DATA
 # =============================================================================
+def get_filtro_datas(request):
+    """Função auxiliar para obter e padronizar as datas de filtro (início/fim)"""
+    data_inicio_str = request.args.get('inicio')
+    data_fim_str = request.args.get('fim')
+    hoje_local = date.today()
+    
+    # Define o padrão (últimos 7 dias) se nenhuma data for fornecida
+    if not data_inicio_str:
+        data_inicio_str = (hoje_local - timedelta(days=6)).strftime('%Y-%m-%d')
+    if not data_fim_str:
+        data_fim_str = hoje_local.strftime('%Y-%m-%d')
+
+    try:
+        # Converte as strings para objetos datetime (início do dia e fim do dia)
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+    except ValueError:
+        flash('Formato de data inválido. Usando filtro padrão (últimos 7 dias).', 'danger')
+        data_fim = datetime.now().replace(hour=23, minute=59, second=59) 
+        data_inicio = (data_fim - timedelta(days=6)).replace(hour=0, minute=0, second=0)
+        data_inicio_str = data_inicio.strftime('%Y-%m-%d')
+        data_fim_str = data_fim.strftime('%Y-%m-%d')
+        
+    return data_inicio_str, data_fim_str, data_inicio, data_fim
+
 @app.route('/relatorios')
 @login_required
 def relatorios():
@@ -885,104 +896,60 @@ def relatorios():
         flash('Acesso não autorizado!', 'danger')
         return redirect(url_for('vendas'))
 
-    # --- Lógica de Filtro de Data ---
-    data_inicio_str = request.args.get('inicio')
-    data_fim_str = request.args.get('fim')
+    # --- Lógica de Filtro de Data e Caixa ---
+    data_inicio_str, data_fim_str, data_inicio, data_fim = get_filtro_datas(request)
     
-    # --- Lógica de Filtro de Caixa (Usuário) ---
     caixa_id_str = request.args.get('caixa_id', '0') # '0' significa "Todos"
     caixa_selecionado = 0
     try:
         caixa_selecionado = int(caixa_id_str)
     except ValueError:
-        caixa_selecionado = 0 # Volta para "Todos" se o valor for inválido
+        caixa_selecionado = 0 
 
-    # --- Lógica de Filtro de Forma de Pagamento ---
     forma_pgto_selecionada = request.args.get('forma_pgto', 'todos') # 'todos' é o padrão
-
-    # ===================================================================
-    #           INÍCIO DA CORREÇÃO (PADRÃO DE 7 DIAS EM HORA LOCAL)
-    # ===================================================================
-    # Define o padrão (últimos 7 dias) se nenhuma data for fornecida
-    hoje_local = date.today() # CORRIGIDO
-    if not data_inicio_str:
-        # Pega 6 dias atrás (para completar 7 dias)
-        data_inicio_str = (hoje_local - timedelta(days=6)).strftime('%Y-%m-%d')
-    if not data_fim_str:
-        data_fim_str = hoje_local.strftime('%Y-%m-%d')
-    # ===================================================================
-    #            FIM DA CORREÇÃO (PADRÃO DE 7 DIAS EM HORA LOCAL)
-    # ===================================================================
-
-    try:
-        # Converte as strings para objetos datetime (início do dia e fim do dia)
-        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
-        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-    except ValueError:
-        flash('Formato de data inválido.', 'danger')
-        # Se inválido, volta para o padrão de 7 dias LOCAL
-        data_fim_dt_local = datetime.now().replace(hour=23, minute=59, second=59) # CORRIGIDO
-        data_inicio_dt_local = (data_fim_dt_local - timedelta(days=6)).replace(hour=0, minute=0, second=0) # CORRIGIDO
-        data_inicio_str = data_inicio_dt_local.strftime('%Y-%m-%d')
-        data_fim_str = data_fim_dt_local.strftime('%Y-%m-%d')
-        # Define os objetos de data/hora para a consulta
-        data_inicio = data_inicio_dt_local
-        data_fim = data_fim_dt_local
-
 
     # Busca todos os caixas (usuários) para o filtro dropdown
     caixas = Usuario.query.order_by(Usuario.nome).all()
     nome_filtro = "Geral (Todos os Caixas)"
 
-    # --- 1. Consultas para o Sumário ---
-    query_sumario = db.session.query(
-        db.func.count(Venda.id).label('num_vendas'),
-        db.func.sum(Venda.valor_total).label('total_vendido')
-    ).filter(
-        # NÃO FILTRA POR STATUS AQUI, pois queremos contar canceladas
-        Venda.data_venda.between(data_inicio, data_fim)
-    )
-    
-    # Query separada para o TOTAL VENDIDO (apenas finalizadas)
-    query_total_vendido = db.session.query(
-        db.func.sum(Venda.valor_total).label('total_vendido')
-    ).filter(
-        Venda.status == 'finalizada', # <-- Apenas finalizadas
+    # Query base para vendas finalizadas no período
+    base_query_vendas_finalizadas = Venda.query.filter(
+        Venda.status == 'finalizada',
         Venda.data_venda.between(data_inicio, data_fim)
     )
 
-    # Query separada para NÚMERO DE VENDAS (apenas finalizadas)
-    query_num_vendas = db.session.query(
-        db.func.count(Venda.id).label('num_vendas')
-    ).filter(
-        Venda.status == 'finalizada', # <-- Apenas finalizadas
-        Venda.data_venda.between(data_inicio, data_fim)
-    )
-    
     # Aplica filtro de caixa se um específico foi selecionado
     if caixa_selecionado > 0:
-        query_sumario = query_sumario.filter(Venda.usuario_id == caixa_selecionado)
-        query_total_vendido = query_total_vendido.filter(Venda.usuario_id == caixa_selecionado)
-        query_num_vendas = query_num_vendas.filter(Venda.usuario_id == caixa_selecionado)
+        base_query_vendas_finalizadas = base_query_vendas_finalizadas.filter(Venda.usuario_id == caixa_selecionado)
         usuario_filtro = db.session.get(Usuario, caixa_selecionado)
         if usuario_filtro:
             nome_filtro = f"Caixa: {usuario_filtro.nome}"
 
-    # Aplica filtro de forma de pagamento
-    if forma_pgto_selecionada != 'todos':
-        query_sumario = query_sumario.filter(Venda.forma_pagamento == forma_pgto_selecionada)
-        query_total_vendido = query_total_vendido.filter(Venda.forma_pagamento == forma_pgto_selecionada)
-        query_num_vendas = query_num_vendas.filter(Venda.forma_pagamento == forma_pgto_selecionada)
-
-    # Executa as queries
-    sumario = query_sumario.first()
-    total_vendido_obj = query_total_vendido.first()
-    num_vendas_obj = query_num_vendas.first()
-
-    # Cálculo do Ticket Médio
-    total_vendido = total_vendido_obj.total_vendido or 0
-    num_vendas = num_vendas_obj.num_vendas or 0
+    # Query para total vendido e número de vendas
+    vendas_filtradas = base_query_vendas_finalizadas.all()
+    total_vendido = sum(v.valor_total for v in vendas_filtradas)
+    num_vendas = len(vendas_filtradas)
     ticket_medio = (total_vendido / num_vendas) if num_vendas > 0 else 0
+
+    # Query para pagamentos (para aplicar o filtro de forma de pagamento)
+    query_pagamentos_agrupados = db.session.query(
+        PagamentoVenda.forma_pagamento,
+        func.sum(PagamentoVenda.valor).label('total_pago')
+    ).join(Venda).filter(
+        Venda.status == 'finalizada',
+        Venda.data_venda.between(data_inicio, data_fim)
+    )
+    
+    # Aplica filtro de caixa para pagamentos
+    if caixa_selecionado > 0:
+        query_pagamentos_agrupados = query_pagamentos_agrupados.filter(Venda.usuario_id == caixa_selecionado)
+
+    # Aplica filtro de forma de pagamento para o resumo (se não for 'todos')
+    if forma_pgto_selecionada != 'todos':
+        query_pagamentos_agrupados = query_pagamentos_agrupados.filter(PagamentoVenda.forma_pagamento == forma_pgto_selecionada)
+
+
+    pagamentos_agrupados = query_pagamentos_agrupados.group_by(PagamentoVenda.forma_pagamento).all()
 
     # --- 2. Consulta de Produtos Mais Vendidos (APENAS VENDAS FINALIZADAS) ---
     query_produtos = db.session.query(
@@ -1001,9 +968,11 @@ def relatorios():
     if caixa_selecionado > 0:
         query_produtos = query_produtos.filter(Venda.usuario_id == caixa_selecionado)
 
-    # Aplica filtro de forma de pagamento
+    # Aplica filtro de forma de pagamento (se a venda CONTÉM o pagamento)
     if forma_pgto_selecionada != 'todos':
-        query_produtos = query_produtos.filter(Venda.forma_pagamento == forma_pgto_selecionada)
+        query_produtos = query_produtos.join(PagamentoVenda, PagamentoVenda.venda_id == Venda.id)\
+                                       .filter(PagamentoVenda.forma_pagamento == forma_pgto_selecionada)
+
 
     produtos_vendidos = query_produtos.group_by(Produto.id)\
                                       .order_by(db.func.sum(ItemVenda.quantidade).desc())\
@@ -1026,7 +995,8 @@ def relatorios():
         
     # Aplica filtro de forma de pagamento
     if forma_pgto_selecionada != 'todos':
-        query_itens = query_itens.filter(Venda.forma_pagamento == forma_pgto_selecionada)
+        query_itens = query_itens.join(PagamentoVenda, PagamentoVenda.venda_id == Venda.id)\
+                                 .filter(PagamentoVenda.forma_pagamento == forma_pgto_selecionada)
 
     itens_vendidos_detalhe = query_itens.order_by(Venda.data_venda.desc()).all()
 
@@ -1039,99 +1009,122 @@ def relatorios():
                          ticket_medio=ticket_medio,
                          produtos_vendidos=produtos_vendidos,
                          itens_vendidos_detalhe=itens_vendidos_detalhe,
+                         pagamentos_agrupados=pagamentos_agrupados, # Pagamentos agrupados
                          caixas=caixas, # Envia a lista de caixas para o filtro
                          caixa_selecionado=caixa_selecionado, # Envia o ID do caixa selecionado
                          nome_filtro=nome_filtro, # Envia o nome do filtro
-                         forma_pgto_selecionada=forma_pgto_selecionada # Envia a forma de pgto
+                         forma_pgto_selecionada=forma_pgto_selecionada
                          )
+# =============================================================================
+#           FIM DA ROTA MODIFICADA (RELATÓRIOS)
+# =============================================================================
+
 
 # =============================================================================
-#           INÍCIO DA NOVA ROTA (RELATÓRIO DE CUPONS)
+#           NOVA ROTA: RELATÓRIO CONSOLIDADO DE RECEBIMENTOS POR FORMA
 # =============================================================================
-@app.route('/relatorio_cupons')
+@app.route('/relatorios/recebimentos_consolidados')
 @login_required
-def relatorio_cupons():
-    """Rota para relatório de cupons/vendas individuais (Apenas Admin)"""
+def relatorio_recebimentos_consolidados():
+    """
+    Nova Rota para relatório consolidado de recebimentos por Forma de Pagamento e por Caixa (Operador).
+    """
     if not current_user.is_admin():
         flash('Acesso não autorizado!', 'danger')
         return redirect(url_for('vendas'))
 
-    # --- 1. Lógica de Filtro de Data (copiada de /relatorios) ---
-    data_inicio_str = request.args.get('inicio')
-    data_fim_str = request.args.get('fim')
+    # 1. Obter e processar datas de filtro (usando a função auxiliar)
+    data_inicio_str, data_fim_str, data_inicio, data_fim = get_filtro_datas(request)
     
-    # --- 2. Lógica de Filtro de Caixa (Usuário) (copiada de /relatorios) ---
-    caixa_id_str = request.args.get('caixa_id', '0') # '0' significa "Todos"
+    # 2. Obter caixas para o dropdown
+    caixas = Usuario.query.order_by(Usuario.nome).all()
+    
+    # 3. Consulta principal: Agrupar por FORMA DE PAGAMENTO e por OPERADOR
+    # O SQLalchemy precisa que a coluna PagamentoVenda.forma_pagamento seja acessível
+    # É necessário fazer 3 JOINS: PagamentoVenda -> Venda -> Usuario
+    
+    query_recebimentos = db.session.query(
+        PagamentoVenda.forma_pagamento,
+        Usuario.nome.label('operador_nome'),
+        func.sum(PagamentoVenda.valor).label('total_pago')
+    ).join(Venda, Venda.id == PagamentoVenda.venda_id)\
+     .join(Usuario, Usuario.id == Venda.usuario_id)\
+     .filter(
+        Venda.status == 'finalizada', # Apenas vendas finalizadas
+        PagamentoVenda.data_pagamento.between(data_inicio, data_fim)
+     )
+     
+    # Aplica filtro de caixa (se selecionado)
+    caixa_id_str = request.args.get('caixa_id', '0')
     caixa_selecionado = 0
     try:
         caixa_selecionado = int(caixa_id_str)
     except ValueError:
-        caixa_selecionado = 0 
-
-    # --- 3. Lógica de Filtro de Forma de Pagamento (copiada de /relatorios) ---
-    forma_pgto_selecionada = request.args.get('forma_pgto', 'todos') # 'todos' é o padrão
-
-    # --- 4. Define o padrão (últimos 7 dias) (copiado de /relatorios) ---
-    hoje_local = date.today()
-    if not data_inicio_str:
-        data_inicio_str = (hoje_local - timedelta(days=6)).strftime('%Y-%m-%d')
-    if not data_fim_str:
-        data_fim_str = hoje_local.strftime('%Y-%m-%d')
-
-    try:
-        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
-        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-    except ValueError:
-        flash('Formato de data inválido.', 'danger')
-        data_fim = datetime.now().replace(hour=23, minute=59, second=59)
-        data_inicio = (data_fim - timedelta(days=6)).replace(hour=0, minute=0, second=0)
-        data_inicio_str = data_inicio.strftime('%Y-%m-%d')
-        data_fim_str = data_fim.strftime('%Y-%m-%d')
-
-
-    # --- 5. Busca caixas e nome do filtro (copiado de /relatorios) ---
-    caixas = Usuario.query.order_by(Usuario.nome).all()
-    nome_filtro = "Geral (Todos os Caixas)"
-
-    # --- 6. Consulta Principal (Vendas/Cupons) ---
-    # Começamos com a query base, já filtrando por status 'finalizada' e datas
-    base_query = db.session.query(Venda).join(Usuario).filter(
-        Venda.status == 'finalizada',
-        Venda.data_venda.between(data_inicio, data_fim)
-    )
-
-    # Aplica filtro de caixa se um específico foi selecionado
+        caixa_selecionado = 0
+        
     if caixa_selecionado > 0:
-        base_query = base_query.filter(Venda.usuario_id == caixa_selecionado)
-        usuario_filtro = db.session.get(Usuario, caixa_selecionado)
-        if usuario_filtro:
-            nome_filtro = f"Caixa: {usuario_filtro.nome}"
-
-    # Aplica filtro de forma de pagamento
-    if forma_pgto_selecionada != 'todos':
-        base_query = base_query.filter(Venda.forma_pagamento == forma_pgto_selecionada)
-
-    # Executa a query para obter a lista de vendas (cupons)
-    vendas_lista = base_query.order_by(Venda.data_venda.desc()).all()
+        query_recebimentos = query_recebimentos.filter(Venda.usuario_id == caixa_selecionado)
     
-    # Calcula o total geral dos cupons filtrados
-    # (Usamos a 'base_query' para somar apenas os valores filtrados)
-    total_geral_cupons = base_query.with_entities(
-        func.sum(Venda.valor_total)
-    ).scalar() or 0.0
+    # Aplica agrupamento
+    query_recebimentos = query_recebimentos.group_by(
+        PagamentoVenda.forma_pagamento, 
+        Usuario.nome
+    ).order_by(Usuario.nome, PagamentoVenda.forma_pagamento).all()
 
-    return render_template('relatorio_cupons.html',
-                         vendas_lista=vendas_lista,
-                         total_geral_cupons=total_geral_cupons,
+
+    # 4. Processar resultados para o template (Calculando Totais e Agrupando por Operador)
+    
+    # Estrutura final: { 'operador': [{'forma': 'Dinheiro', 'total': 100.00}, ...], 'totais_gerais': {...} }
+    dados_relatorio = {}
+    totais_gerais = {
+        'total_dinheiro': 0.0,
+        'total_cartao': 0.0,
+        'total_pix': 0.0,
+        'total_outros': 0.0,
+        'total_global': 0.0
+    }
+
+    # As formas principais que queremos destacar
+    formas_principais = ['dinheiro', 'cartao', 'pix']
+
+    for forma, operador_nome, total_pago in query_recebimentos:
+        # Inicializa o operador no dicionário, se necessário
+        if operador_nome not in dados_relatorio:
+            dados_relatorio[operador_nome] = {f'total_{f}': 0.0 for f in formas_principais}
+            dados_relatorio[operador_nome]['outros'] = 0.0
+            dados_relatorio[operador_nome]['total_operador'] = 0.0
+            dados_relatorio[operador_nome]['detalhes'] = [] # Para formas extras
+
+        forma_lower = forma.lower()
+        valor = float(total_pago or 0.0)
+
+        # Soma no total geral
+        totais_gerais['total_global'] += valor
+        
+        # Soma no total do operador
+        dados_relatorio[operador_nome]['total_operador'] += valor
+
+        # Soma nas categorias específicas
+        if forma_lower in formas_principais:
+            totais_gerais[f'total_{forma_lower}'] += valor
+            dados_relatorio[operador_nome][f'total_{forma_lower}'] += valor
+        else:
+            totais_gerais['total_outros'] += valor
+            dados_relatorio[operador_nome]['outros'] += valor
+            # Adiciona forma de pagamento extra no detalhe
+            dados_relatorio[operador_nome]['detalhes'].append({'forma': forma.title(), 'valor': valor})
+
+
+    return render_template('relatorio_recebimentos_consolidados.html',
                          data_inicio=data_inicio_str,
                          data_fim=data_fim_str,
-                         caixas=caixas, 
+                         caixas=caixas,
                          caixa_selecionado=caixa_selecionado,
-                         nome_filtro=nome_filtro,
-                         forma_pgto_selecionada=forma_pgto_selecionada
+                         dados_relatorio=dados_relatorio,
+                         totais_gerais=totais_gerais
                          )
 # =============================================================================
-#           FIM DA NOVA ROTA
+#           FIM DA NOVA ROTA (RELATÓRIO CONSOLIDADO DE RECEBIMENTOS)
 # =============================================================================
 
 
@@ -1157,7 +1150,77 @@ def cupom_venda(venda_id):
 
 
 # =============================================================================
-#           INÍCIO DA NOVA ROTA (EXPORTAR EXCEL)
+# ROTA DE RELATÓRIO DE CUPONS (ATUALIZADA)
+# =============================================================================
+@app.route('/relatorio_cupons')
+@login_required
+def relatorio_cupons():
+    """Rota para relatório de cupons/vendas individuais (Apenas Admin)"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('vendas'))
+
+    # --- 1. Lógica de Filtro de Data ---
+    data_inicio_str, data_fim_str, data_inicio, data_fim = get_filtro_datas(request)
+    
+    # --- 2. Lógica de Filtro de Caixa (Usuário) ---
+    caixa_id_str = request.args.get('caixa_id', '0') # '0' significa "Todos"
+    caixa_selecionado = 0
+    try:
+        caixa_selecionado = int(caixa_id_str)
+    except ValueError:
+        caixa_selecionado = 0 
+
+    # --- 3. Lógica de Filtro de Forma de Pagamento ---
+    forma_pgto_selecionada = request.args.get('forma_pgto', 'todos') # 'todos' é o padrão
+
+    # --- 5. Busca caixas e nome do filtro ---
+    caixas = Usuario.query.order_by(Usuario.nome).all()
+    nome_filtro = "Geral (Todos os Caixas)"
+
+    # --- 6. Consulta Principal (Vendas/Cupons) ---
+    # Começamos com a query base, já filtrando por status 'finalizada' e datas
+    base_query = db.session.query(Venda).join(Usuario).filter(
+        Venda.status == 'finalizada',
+        Venda.data_venda.between(data_inicio, data_fim)
+    )
+
+    # Aplica filtro de caixa se um específico foi selecionado
+    if caixa_selecionado > 0:
+        base_query = base_query.filter(Venda.usuario_id == caixa_selecionado)
+        usuario_filtro = db.session.get(Usuario, caixa_selecionado)
+        if usuario_filtro:
+            nome_filtro = f"Caixa: {usuario_filtro.nome}"
+
+    # Aplica filtro de forma de pagamento (se a venda CONTÉM o pagamento)
+    if forma_pgto_selecionada != 'todos':
+        # Faz um JOIN com PagamentoVenda para filtrar as vendas que têm aquele pagamento
+        base_query = base_query.join(PagamentoVenda, PagamentoVenda.venda_id == Venda.id)\
+                               .filter(PagamentoVenda.forma_pagamento == forma_pgto_selecionada)
+
+
+    # Executa a query para obter a lista de vendas (cupons)
+    vendas_lista = base_query.order_by(Venda.data_venda.desc()).all()
+    
+    # Calcula o total geral dos cupons filtrados (usando a propriedade dinâmica valor_total)
+    total_geral_cupons = sum(v.valor_total for v in vendas_lista)
+
+    return render_template('relatorio_cupons.html',
+                         vendas_lista=vendas_lista,
+                         total_geral_cupons=total_geral_cupons,
+                         data_inicio=data_inicio_str,
+                         data_fim=data_fim_str,
+                         caixas=caixas, 
+                         caixa_selecionado=caixa_selecionado,
+                         nome_filtro=nome_filtro,
+                         forma_pgto_selecionada=forma_pgto_selecionada
+                         )
+# =============================================================================
+#           FIM DA ROTA (CUPONS)
+# =============================================================================
+
+# =============================================================================
+#           INÍCIO DA NOVA ROTA (EXPORTAR EXCEL) - AJUSTE PARA MULTIPAGAMENTO
 # =============================================================================
 @app.route('/relatorios/exportar')
 @login_required
@@ -1171,70 +1234,102 @@ def exportar_relatorio():
 
     # --- 1. REPETE A LÓGICA DE FILTRO DA ROTA 'relatorios' ---
     # (Pega os valores da query string)
-    data_inicio_str = request.args.get('inicio')
-    data_fim_str = request.args.get('fim')
+    data_inicio_str, data_fim_str, data_inicio, data_fim = get_filtro_datas(request)
+    
     caixa_id_str = request.args.get('caixa_id', '0')
     caixa_selecionado = int(caixa_id_str)
     forma_pgto_selecionada = request.args.get('forma_pgto', 'todos')
-
-    # ===========================================================
-    #           CORREÇÃO DE FUSO (Usar HORA LOCAL)
-    # ===========================================================
-    # (Define o padrão de 7 dias LOCAL se não vier na query string)
-    hoje_local = date.today() # CORRIGIDO
-    if not data_inicio_str:
-        data_inicio_str = (hoje_local - timedelta(days=6)).strftime('%Y-%m-%d')
-    if not data_fim_str:
-        data_fim_str = hoje_local.strftime('%Y-%m-%d')
-
-    try:
-        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
-        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-    except ValueError:
-        data_fim_dt_local = datetime.now().replace(hour=23, minute=59, second=59) # CORRIGIDO
-        data_inicio_dt_local = (data_fim_dt_local - timedelta(days=6)).replace(hour=0, minute=0, second=0) # CORRIGIDO
-        data_inicio_str = data_inicio_dt_local.strftime('%Y-%m-%d')
-        data_fim_str = data_fim_dt_local.strftime('%Y-%m-%d')
-        data_inicio = data_inicio_dt_local
-        data_fim = data_fim_dt_local
-    # ===========================================================
-    #           FIM DA CORREÇÃO DE FUSO
-    # ===========================================================
+    # --- FIM DA LÓGICA DE FILTRO ---
 
 
-    # --- 2. EXECUTA A MESMA CONSULTA DE ITENS VENDIDOS ---
-    query_itens = db.session.query(
-        ItemVenda
-    ).join(Venda, Venda.id == ItemVenda.venda_id)\
-     .join(Produto, Produto.id == ItemVenda.produto_id)\
-     .filter(
-        # Exporta todos os status (finalizada e cancelada)
+    # Consulta Venda e Itens de Venda
+    vendas_com_itens = Venda.query.filter(
+        Venda.status.in_(['finalizada', 'cancelada']), # Inclui canceladas para relatório de itens
         Venda.data_venda.between(data_inicio, data_fim)
-     )
-    
+    )
+
     if caixa_selecionado > 0:
-        query_itens = query_itens.filter(Venda.usuario_id == caixa_selecionado)
+        vendas_com_itens = vendas_com_itens.filter(Venda.usuario_id == caixa_selecionado)
+    
+    # Se há filtro de pagamento, filtramos as vendas antes de iterar
     if forma_pgto_selecionada != 'todos':
-        query_itens = query_itens.filter(Venda.forma_pagamento == forma_pgto_selecionada)
+        vendas_com_itens = vendas_com_itens.join(PagamentoVenda, PagamentoVenda.venda_id == Venda.id)\
+                                           .filter(PagamentoVenda.forma_pagamento == forma_pgto_selecionada)
 
-    itens_vendidos_detalhe = query_itens.order_by(Venda.data_venda.desc()).all()
 
-    # --- 3. PREPARA OS DADOS PARA O PANDAS ---
+    vendas_lista_final = vendas_com_itens.order_by(Venda.data_venda.desc()).all()
+
+
     dados_para_planilha = []
-    for item in itens_vendidos_detalhe:
-        dados_para_planilha.append({
-            'ID Venda': item.venda.id,
-            'Data Venda': item.venda.data_venda.strftime('%Y-%m-%d %H:%M:%S'), # Agora está em hora local
-            'Status': item.venda.status.title(), # Adiciona o status
-            'Operador': item.venda.operador.nome,
-            'Forma Pgto': item.venda.forma_pagamento.title(),
-            'ID Produto': item.produto.id,
-            'Cód. Barras': item.produto.codigo_barras,
-            'Produto': item.produto.nome,
-            'Quantidade': item.quantidade,
-            'Preço Unit. (R$)': item.preco_unitario,
-            'Subtotal (R$)': item.subtotal
-        })
+    for venda in vendas_lista_final:
+        # Pega as informações de pagamento uma única vez para a venda
+        pagamentos_info = {}
+        # Garante que as colunas Dinheiro, Cartão, PIX existam com valor 0.0
+        formas_colunas = {
+            'dinheiro': 0.0,
+            'cartao': 0.0,
+            'pix': 0.0,
+        }
+        outras_formas = []
+        
+        for p in venda.pagamentos:
+            forma_lower = p.forma_pagamento.lower()
+            valor = p.valor or 0.0
+            
+            if forma_lower in formas_colunas:
+                formas_colunas[forma_lower] += valor
+            else:
+                outras_formas.append(f"{p.forma_pagamento.title()}: R$ {valor:.2f}")
+
+        row = {
+            'ID Venda': venda.id,
+            'Nº Venda': venda.numero_venda,
+            'Data Venda': venda.data_venda.strftime('%Y-%m-%d %H:%M:%S'),
+            'Status Venda': venda.status.title(),
+            'Operador': venda.operador.nome,
+            'Valor Total Venda (R$)': venda.valor_total,
+            'Valor Pago Total (R$)': venda.valor_pago,
+            'Troco Venda (R$)': venda.troco,
+            
+            # Detalhamento de Pagamentos
+            'Dinheiro (R$)': formas_colunas['dinheiro'],
+            'Cartão (R$)': formas_colunas['cartao'],
+            'PIX (R$)': formas_colunas['pix'],
+            'Outras Formas': ", ".join(outras_formas), # Lista as outras formas em uma coluna
+            
+            'ID Item': '',
+            'ID Produto': '',
+            'Cód. Barras Produto': '',
+            'Produto': '',
+            'Quantidade': '',
+            'Preço Unit. (R$)': '',
+            'Subtotal Item (R$)': ''
+        }
+        dados_para_planilha.append(row.copy()) # Adiciona a linha da venda (header)
+        
+        # Adiciona as linhas dos itens de venda
+        for item in venda.itens:
+             item_row = row.copy() # Copia as informações da venda
+             
+             # Zera os totais (para que eles apareçam apenas na linha "Header" da venda)
+             item_row['Valor Total Venda (R$)'] = ''
+             item_row['Valor Pago Total (R$)'] = ''
+             item_row['Troco Venda (R$)'] = ''
+             item_row['Dinheiro (R$)'] = ''
+             item_row['Cartão (R$)'] = ''
+             item_row['PIX (R$)'] = ''
+             item_row['Outras Formas'] = ''
+             
+             # Preenche os detalhes do item
+             item_row['ID Item'] = item.id
+             item_row['ID Produto'] = item.produto.id
+             item_row['Cód. Barras Produto'] = item.produto.codigo_barras
+             item_row['Produto'] = item.produto.nome
+             item_row['Quantidade'] = item.quantidade
+             item_row['Preço Unit. (R$)'] = item.preco_unitario
+             item_row['Subtotal Item (R$)'] = item.subtotal
+             
+             dados_para_planilha.append(item_row)
 
     if not dados_para_planilha:
         flash('Nenhum dado encontrado para exportar.', 'warning')
@@ -1253,7 +1348,8 @@ def exportar_relatorio():
     output.seek(0) # Volta ao início do buffer
 
     # --- 5. CRIA A RESPOSTA E ENVIA O ARQUIVO ---
-    nome_arquivo = f"Relatorio_Vendas_{data_inicio_str}_a_{data_fim_str}.xlsx"
+    data_formatada = datetime.now().strftime('%Y%m%d_%H%M%S')
+    nome_arquivo = f"Relatorio_Det_Vendas_{data_formatada}.xlsx"
     
     response = make_response(output.read())
     response.headers["Content-Disposition"] = f"attachment; filename={nome_arquivo}"
@@ -1262,8 +1358,183 @@ def exportar_relatorio():
     return response
 
 # =============================================================================
-#           FIM DA NOVA ROTA (EXPORTAR EXCEL)
+#           FIM DA ROTA (EXPORTAR EXCEL)
 # =============================================================================
+
+@app.route('/vendas/editar_pagamento/<int:venda_id>', methods=['POST'])
+@login_required
+def editar_pagamento(venda_id):
+    """
+    Rota para corrigir a forma de pagamento de uma venda já finalizada.
+    Apenas administradores podem realizar essa ação.
+    Se a venda tem mais de um pagamento, a edição é bloqueada (para forçar cancelamento/re-lançamento).
+    """
+    if not current_user.is_admin():
+        flash('Acesso negado: Apenas administradores podem alterar vendas.', 'danger')
+        return redirect(url_for('relatorios'))
+
+    venda = db.session.get(Venda, venda_id)
+    
+    if not venda:
+        flash('Venda não encontrada.', 'danger')
+        return redirect(url_for('relatorios', **request.args))
+    
+    if venda.status == 'cancelada':
+        flash('Não é possível editar uma venda cancelada.', 'warning')
+        return redirect(url_for('relatorios', **request.args))
+    
+    # Regra Simplificada: Só permite edição fácil se houver EXATAMENTE UM pagamento
+    if len(venda.pagamentos) != 1:
+        flash('Edição direta de forma de pagamento bloqueada para vendas com múltiplos pagamentos ou nenhum. Cancele e refaça a venda, ou edite os pagamentos diretamente no banco se necessário.', 'danger')
+        return redirect(url_for('relatorios', **request.args))
+
+
+    nova_forma = request.form.get('nova_forma_pagamento')
+    
+    if nova_forma in ['dinheiro', 'cartao', 'pix', 'transferencia', 'cheque']:
+        
+        pagamento_unico = venda.pagamentos[0]
+        forma_antiga = pagamento_unico.forma_pagamento
+        valor_antigo = pagamento_unico.valor
+
+        # Atualiza o pagamento único
+        pagamento_unico.forma_pagamento = nova_forma
+        
+        # Se era dinheiro e mudou, e o valor pago era maior que o total, 
+        # forçamos o valor do pagamento para ser o total da venda.
+        if forma_antiga == 'dinheiro' and pagamento_unico.valor > venda.valor_total:
+             pagamento_unico.valor = venda.valor_total
+        
+        # Recalcula as propriedades dinâmicas (valor_pago e troco) e salva.
+        db.session.commit()
+        
+        # A mensagem de flash deve ser mais informativa sobre o que realmente foi alterado
+        flash(f'Venda #{venda.numero_venda} (Pagamento Único) alterada de {forma_antiga.title()} (R$ {valor_antigo:.2f}) para {nova_forma.title()} (R$ {pagamento_unico.valor:.2f}).', 'success')
+    else:
+        flash('Forma de pagamento inválida.', 'danger')
+
+    # Passa os argumentos de filtro de volta para a URL do relatorio
+    return redirect(url_for('relatorios', 
+                          inicio=request.args.get('inicio'),
+                          fim=request.args.get('fim'),
+                          caixa_id=request.args.get('caixa_id'),
+                          forma_pgto=request.args.get('forma_pgto')
+                          ))
+
+@app.route('/vendas/cancelar/<int:venda_id>', methods=['POST'])
+@login_required
+def vendas_cancelar(venda_id):
+    """
+    Rota para cancelar uma venda finalizada (estorno).
+    Apenas administradores podem realizar essa ação.
+    """
+    if not current_user.is_admin():
+        flash('Acesso negado: Apenas administradores podem cancelar vendas.', 'danger')
+        return redirect(url_for('relatorios'))
+
+    venda = db.session.get(Venda, venda_id)
+
+    if not venda:
+        flash('Venda não encontrada.', 'danger')
+        return redirect(url_for('relatorios', **request.args))
+    
+    if venda.status == 'cancelada':
+        flash('Esta venda já foi cancelada.', 'info')
+        return redirect(url_for('relatorios', **request.args))
+
+    try:
+        # Inicia a transação
+        
+        # 1. Devolve os itens ao estoque
+        for item in venda.itens:
+            produto = item.produto # Carrega o produto associado
+            if produto:
+                produto.estoque_atual += item.quantidade
+        
+        # 2. Marca a venda como "cancelada"
+        venda.status = 'cancelada'
+        
+        db.session.commit()
+        flash(f'Venda #{venda.numero_venda} foi cancelada com sucesso. O estoque foi devolvido.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao cancelar a venda: {str(e)}', 'danger')
+    
+    # Redireciona de volta para a tela de relatórios com os filtros
+    return redirect(url_for('relatorios', 
+                          inicio=request.args.get('inicio'),
+                          fim=request.args.get('fim'),
+                          caixa_id=request.args.get('caixa_id'),
+                          forma_pgto=request.args.get('forma_pgto')
+                          ))
+
+@app.route('/caixa/cupom_fechamento')
+@login_required
+def cupom_fechamento():
+    """
+    Gera um cupom/relatório de fechamento para o caixa ABERTO atual.
+    """
+    caixa_aberto, movimento_atual = get_caixa_aberto()
+    
+    if not caixa_aberto:
+        flash('Não há caixa aberto para gerar relatório.', 'warning')
+        if current_user.is_admin():
+            return redirect(url_for('dashboard'))
+        return redirect(url_for('vendas'))
+
+    # --- Recalcula os totais para o cupom ---
+    
+    # 1. Query base das vendas no período (abertura local até agora local)
+    query_vendas = Venda.query.filter(
+        Venda.usuario_id == current_user.id,
+        Venda.status == 'finalizada',
+        Venda.data_venda >= movimento_atual.data_abertura,
+        Venda.data_venda <= datetime.now() 
+    )
+    
+    # 2. Total de Vendas (para contagem)
+    vendas_periodo = query_vendas.all()
+    total_vendas_count = len(vendas_periodo)
+
+    # 3. Agrupa os totais por forma de pagamento (usando PagamentoVenda)
+    vendas_agrupadas = db.session.query(
+        PagamentoVenda.forma_pagamento,
+        func.sum(PagamentoVenda.valor).label('total')
+    ).join(Venda).filter(
+        Venda.usuario_id == current_user.id,
+        Venda.status == 'finalizada',
+        PagamentoVenda.data_pagamento >= movimento_atual.data_abertura,
+        PagamentoVenda.data_pagamento <= datetime.now()
+    ).group_by(PagamentoVenda.forma_pagamento).all()
+
+    # 4. Prepara o dicionário de totais (incluindo tratamento de outras formas)
+    totais = {
+        'dinheiro': 0.0,
+        'cartao': 0.0,
+        'pix': 0.0,
+        'outros': 0.0,
+        'total_geral': 0.0
+    }
+    
+    for forma, total in vendas_agrupadas:
+        valor = float(total or 0.0)
+        totais['total_geral'] += valor
+        
+        forma_lower = str(forma).lower()
+        if forma_lower in totais and forma_lower != 'outros' and forma_lower != 'total_geral':
+            totais[forma_lower] = valor
+        elif forma_lower not in ['dinheiro', 'cartao', 'pix', 'total_geral']:
+             # Soma em 'outros' se não for uma das 3 principais
+            totais['outros'] += valor
+
+    # O "Saldo Esperado em Dinheiro"
+    saldo_esperado_dinheiro = (movimento_atual.saldo_inicial or 0) + totais['dinheiro']
+
+    return render_template('cupom_fechamento.html', 
+                         caixa=movimento_atual,
+                         totais=totais,
+                         saldo_esperado_dinheiro=saldo_esperado_dinheiro)
 
 
 # =============================================================================
@@ -1375,14 +1646,14 @@ def api_buscar_produtos_por_nome():
 # =============================================================================
 
 # =============================================================================
-#           INÍCIO DA ROTA ALTERADA (SEQUENCIAL 1, 2, 3, 4)
+#           INÍCIO DA ROTA ALTERADA (FINALIZAR VENDA) - MULTIPAGAMENTO
 # =============================================================================
 @app.route('/vendas/finalizar', methods=['POST'])
 @login_required
 def finalizar_venda():
     """
     API para finalizar a venda.
-    Recebe os dados do carrinho via JSON do JavaScript.
+    Recebe os dados do carrinho e múltiplos pagamentos via JSON.
     """
     # Verifica se o caixa está aberto
     caixa_aberto, movimento_atual = get_caixa_aberto()
@@ -1394,6 +1665,9 @@ def finalizar_venda():
     
     if not data or 'itens' not in data or not data['itens']:
         return jsonify({'error': 'Carrinho vazio'}), 400
+    
+    if 'pagamentos' not in data or not data['pagamentos']:
+        return jsonify({'error': 'Nenhuma forma de pagamento informada.'}), 400
 
     try:
         # Inicia a transação
@@ -1401,34 +1675,21 @@ def finalizar_venda():
         valor_total_venda = 0
         itens_venda_db = []
         
-        # Pega o valor_pago do JSON
-        valor_pago_json = data.get('valor_pago')
-        # Garante que não seja NoneType antes de converter. Se for None, usa 0.
-        valor_pago_float = float(valor_pago_json or 0)
-
-        # Cria a Venda principal 
-        # ATENÇÃO: Iniciamos com numero_venda "PENDENTE" para preencher depois com o ID sequencial
-        nova_venda = Venda(
-            numero_venda="PENDENTE", 
-            valor_total=0, # Será calculado
-            valor_pago=valor_pago_float, # Usa o valor seguro
-            forma_pagamento=data.get('forma_pagamento', 'dinheiro'),
-            status='finalizada',
-            usuario_id=current_user.id
-        )
-        
-        # Loop nos itens do carrinho para validar estoque e calcular total
+        # 1. Loop nos itens do carrinho para validar estoque e calcular total
         for item_json in data['itens']:
-            produto = db.session.get(Produto, item_json['id']) # Usando a nova sintaxe
+            produto = db.session.get(Produto, item_json['id']) 
             quantidade = int(item_json['quantidade'])
             
             if not produto:
                 raise Exception(f'Produto ID {item_json["id"]} não encontrado.')
                 
+            # Verifica o estoque disponível no banco (Produto.estoque_atual)
             if produto.estoque_atual < quantidade:
+                # Se for o caso, pode ser uma falha de concorrência ou cache. Rejeita.
                 raise Exception(f'Estoque insuficiente para {produto.nome}. (Disponível: {produto.estoque_atual})')
 
-            # Atualiza estoque
+
+            # Atualiza estoque (apenas em memória por enquanto)
             produto.estoque_atual -= quantidade
             
             # Calcula subtotal
@@ -1445,225 +1706,68 @@ def finalizar_venda():
             )
             itens_venda_db.append(novo_item_venda)
 
-        # Atualiza a Venda principal com os valores corretos
-        nova_venda.valor_total = valor_total_venda
-        
-        # Calcula o troco
-        if nova_venda.forma_pagamento == 'dinheiro':
-            nova_venda.troco = nova_venda.valor_pago - nova_venda.valor_total
-            if nova_venda.troco < 0:
-                 raise Exception('Valor pago em dinheiro é insuficiente.')
-        else:
-            nova_venda.valor_pago = valor_total_venda # Garante que valor pago é o total
-            nova_venda.troco = 0
-
-        # Adiciona os itens à venda
+        # 2. Cria a Venda principal e calcula o total
+        nova_venda = Venda(
+            numero_venda="PENDENTE", 
+            data_venda=datetime.now(),
+            status='finalizada',
+            usuario_id=current_user.id
+        )
         nova_venda.itens = itens_venda_db
-        
-        # Adiciona à sessão
         db.session.add(nova_venda)
+
+        # 3. Processa e adiciona os pagamentos
+        pagamentos_db = []
+        valor_pago_total = 0.0
         
-        # --- MÁGICA DO SEQUENCIAL ---
-        # O flush envia os dados para o banco para gerar o ID, mas sem commitar (sem fechar a transação)
-        db.session.flush() 
+        # O flush aqui é necessário para que PagamentoVenda possa fazer referência à nova_venda.id, mas
+        # como Venda.id é gerado apenas no flush, e PagamentoVenda faz um backref, o flush pode ser após a venda ser adicionada.
+        db.session.flush()
+
+        for pagamento_json in data['pagamentos']:
+            forma = pagamento_json['forma_pagamento']
+            valor = float(pagamento_json['valor'])
+            valor_pago_total += valor
+            
+            novo_pagamento = PagamentoVenda(
+                venda_id=nova_venda.id,
+                forma_pagamento=forma,
+                valor=valor,
+                data_pagamento=datetime.now()
+            )
+            pagamentos_db.append(novo_pagamento)
         
-        # Agora que temos o ID, atualizamos o numero_venda com o próprio ID (1, 2, 3...)
+        db.session.add_all(pagamentos_db)
+        
+        # Validação do valor pago vs valor total da venda
+        if round(valor_pago_total, 2) < round(valor_total_venda, 2):
+            # Se o pagamento for insuficiente, cancela a transação e reverte o estoque.
+            db.session.rollback()
+            return jsonify({'error': 'Valor total pago insuficiente para o valor total da venda.'}), 400
+        
+        # O cálculo do troco é automático (propriedade dinâmica) no modelo Venda
+        
+        # 4. MÁGICA DO SEQUENCIAL: (O flush foi feito, agora atualiza numero_venda e comita)
         nova_venda.numero_venda = str(nova_venda.id) 
         
-        # Salva tudo no banco definitivamente
+        # 5. Salva tudo no banco definitivamente
         db.session.commit()
         
+        # Usa as propriedades dinâmicas para a resposta
+        troco_final = nova_venda.troco
+
         return jsonify({
-            'success': 'Venda finalizada com sucesso!',
+            'success': f'Venda finalizada com sucesso! Troco: R$ {troco_final:.2f}',
             'venda_id': nova_venda.id,
             'numero_venda': nova_venda.numero_venda
         })
 
     except Exception as e:
         db.session.rollback() # Desfaz qualquer mudança no banco em caso de erro
+        # Retorna o erro específico (stock, valor pago, ou outro)
         return jsonify({'error': str(e)}), 400
 # =============================================================================
-#           FIM DA ROTA ALTERADA
-# =============================================================================
-
-# =============================================================================
-#           INÍCIO DA NOVA ROTA (CUPOM FECHAMENTO)
-# =============================================================================
-
-@app.route('/caixa/cupom_fechamento')
-@login_required
-def cupom_fechamento():
-    """
-    Gera um cupom/relatório de fechamento para o caixa ABERTO atual.
-    """
-    caixa_aberto, movimento_atual = get_caixa_aberto()
-    
-    if not caixa_aberto:
-        flash('Não há caixa aberto para gerar relatório.', 'warning')
-        if current_user.is_admin():
-            return redirect(url_for('dashboard'))
-        return redirect(url_for('vendas'))
-
-    # --- Recalcula os totais para o cupom ---
-    
-    # 1. Query base das vendas no período (abertura local até agora local)
-    query_vendas = Venda.query.filter(
-        Venda.data_venda >= movimento_atual.data_abertura,
-        Venda.data_venda <= datetime.now(), # CORRIGIDO (era utcnow)
-        Venda.usuario_id == current_user.id,
-        Venda.status == 'finalizada'
-    )
-    
-    # 2. Total de Vendas (para contagem)
-    vendas_periodo = query_vendas.all()
-    total_vendas_count = len(vendas_periodo)
-
-    # 3. Agrupa os totais por forma de pagamento
-    vendas_agrupadas = db.session.query(
-        Venda.forma_pagamento,
-        func.sum(Venda.valor_total).label('total')
-    ).filter(
-        Venda.data_venda >= movimento_atual.data_abertura,
-        Venda.data_venda <= datetime.now(), # CORRIGIDO (era utcnow)
-        Venda.usuario_id == current_user.id,
-        Venda.status == 'finalizada'
-    ).group_by(Venda.forma_pagamento).all()
-
-    # 4. Prepara o dicionário de totais
-    totais = {
-        'dinheiro': 0.0,
-        'cartao': 0.0,
-        'pix': 0.0,
-        'total_geral': 0.0,
-        'total_vendas_count': total_vendas_count
-    }
-    
-    for forma, total in vendas_agrupadas:
-        if forma in totais:
-            totais[forma] = float(total or 0.0)
-        totais['total_geral'] += float(total or 0.0)
-    
-    # O "Saldo Esperado em Dinheiro"
-    saldo_esperado_dinheiro = movimento_atual.saldo_inicial + totais['dinheiro']
-
-    return render_template('cupom_fechamento.html', 
-                         caixa=movimento_atual,
-                         totais=totais,
-                         saldo_esperado_dinheiro=saldo_esperado_dinheiro)
-
-# =============================================================================
-#           FIM DA NOVA ROTA (CUPOM FECHAMENTO)
-# =============================================================================
-
-# =============================================================================
-#           INÍCIO DA NOVA ROTA (EDITAR PAGAMENTO)
-# =============================================================================
-@app.route('/vendas/editar_pagamento/<int:venda_id>', methods=['POST'])
-@login_required
-def editar_pagamento(venda_id):
-    """
-    Rota para corrigir a forma de pagamento de uma venda já finalizada.
-    Apenas administradores podem realizar essa ação.
-    """
-    if not current_user.is_admin():
-        flash('Acesso negado: Apenas administradores podem alterar vendas.', 'danger')
-        return redirect(url_for('relatorios'))
-
-    venda = db.session.get(Venda, venda_id)
-    
-    if not venda:
-        flash('Venda não encontrada.', 'danger')
-        return redirect(url_for('relatorios'))
-    
-    # Impede a edição de vendas canceladas
-    if venda.status == 'cancelada':
-        flash('Não é possível editar uma venda cancelada.', 'warning')
-        return redirect(url_for('relatorios', **request.args))
-
-    nova_forma = request.form.get('nova_forma_pagamento')
-    
-    if nova_forma in ['dinheiro', 'cartao', 'pix']:
-        forma_antiga = venda.forma_pagamento
-        venda.forma_pagamento = nova_forma
-        
-        # Ajuste de consistência financeira
-        # Se alterado para algo que não é dinheiro, zera o troco e iguala o valor pago
-        if nova_forma != 'dinheiro':
-            venda.troco = 0.0
-            venda.valor_pago = venda.valor_total
-        # Se alterado DE cartão/pix PARA dinheiro, assume-se pagamento exato para evitar erro de caixa
-        elif forma_antiga != 'dinheiro' and nova_forma == 'dinheiro':
-            venda.troco = 0.0
-            venda.valor_pago = venda.valor_total
-
-        db.session.commit()
-        flash(f'Venda #{venda.numero_venda} alterada de {forma_antiga} para {nova_forma}.', 'success')
-    else:
-        flash('Forma de pagamento inválida.', 'danger')
-
-    # Passa os argumentos de filtro de volta para a URL do relatorio
-    return redirect(url_for('relatorios', 
-                          inicio=request.args.get('inicio'),
-                          fim=request.args.get('fim'),
-                          caixa_id=request.args.get('caixa_id'),
-                          forma_pgto=request.args.get('forma_pgto')
-                          ))
-# =============================================================================
-#           FIM DA NOVA ROTA (EDITAR PAGAMENTO)
-# =============================================================================
-
-# =============================================================================
-#           INÍCIO DA NOVA ROTA (CANCELAR VENDA)
-# =============================================================================
-@app.route('/vendas/cancelar/<int:venda_id>', methods=['POST'])
-@login_required
-def vendas_cancelar(venda_id):
-    """
-    Rota para cancelar uma venda finalizada (estorno).
-    Apenas administradores podem realizar essa ação.
-    """
-    if not current_user.is_admin():
-        flash('Acesso negado: Apenas administradores podem cancelar vendas.', 'danger')
-        return redirect(url_for('relatorios'))
-
-    venda = db.session.get(Venda, venda_id)
-
-    if not venda:
-        flash('Venda não encontrada.', 'danger')
-        return redirect(url_for('relatorios', **request.args))
-    
-    if venda.status == 'cancelada':
-        flash('Esta venda já foi cancelada.', 'info')
-        return redirect(url_for('relatorios', **request.args))
-
-    try:
-        # Inicia a transação
-        
-        # 1. Devolve os itens ao estoque
-        for item in venda.itens:
-            produto = item.produto # Carrega o produto associado
-            if produto:
-                produto.estoque_atual += item.quantidade
-        
-        # 2. Marca a venda como "cancelada"
-        venda.status = 'cancelada'
-        
-        db.session.commit()
-        flash(f'Venda #{venda.numero_venda} foi cancelada com sucesso. O estoque foi devolvido.', 'success')
-
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Erro ao cancelar a venda: {str(e)}', 'danger')
-    
-    # Redireciona de volta para a tela de relatórios com os filtros
-    return redirect(url_for('relatorios', 
-                          inicio=request.args.get('inicio'),
-                          fim=request.args.get('fim'),
-                          caixa_id=request.args.get('caixa_id'),
-                          forma_pgto=request.args.get('forma_pgto')
-                          ))
-# =============================================================================
-#           FIM DA NOVA ROTA (CANCELAR VENDA)
+#           FIM DA ROTA ALTERADA (FINALIZAR VENDA)
 # =============================================================================
 
 

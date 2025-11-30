@@ -1,448 +1,230 @@
 {% extends "base.html" %}
 
-{% block title %}Relatórios - Sistema de Caixa{% endblock %}
-
-{% block extra_css %}
-<style>
-    /* Estilo para esconder o título de impressão na tela */
-    .print-only {
-        display: none;
-    }
-
-    /* ======================================================= */
-    /* INÍCIO DA CORREÇÃO (Impressão A4 - Retrato)     */
-    /* ======================================================= */
-    @media print {
-        /* Define o tamanho da página (A4, retrato) */
-        @page {
-            size: A4 portrait; /* A4 em pé */
-            margin: 20mm 15mm; /* Margens para A4 */
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            font-size: 10pt; /* Tamanho de fonte legível para A4 */
-            color: #000;
-            background-color: #fff; /* Fundo branco */
-        }
-
-        /* Esconde elementos que não devem ser impressos (botões, filtros, etc.) */
-        .no-print {
-            display: none !important;
-        }
-        
-        /* Mostra o título de impressão */
-        .print-only {
-            display: block !important;
-            visibility: visible !important; /* Garante a visibilidade */
-            text-align: center;
-            font-size: 1.5rem; /* Título maior para A4 */
-            margin-bottom: 20px;
-        }
-        
-        /* ================================================== */
-        /* OCULTA OS RESUMOS E O TOP 10 NA IMPRESSÃO      */
-        /* ================================================== */
-        .row.mb-4, /* Linha dos cards de resumo */
-        .col-md-5 /* Coluna da tabela Top 10 */ {
-            display: none !important;
-        }
-        
-        /* ================================================== */
-        /* EXPANDE A TABELA DE LANÇAMENTOS (DETALHE)      */
-        /* ================================================== */
-        .col-md-7 {
-            width: 100% !important;
-            flex: 0 0 100% !important;
-            max-width: 100% !important;
-            padding: 0 !important; /* Remove padding lateral */
-        }
-        
-        .table {
-            color: #000 !important;
-            font-size: 9pt; /* Fonte legível para tabela */
-            width: 100%;
-            border-collapse: collapse;
-            break-inside: auto; /* Permite que a tabela quebre entre páginas */
-        }
-        .table tr {
-            break-inside: avoid-page; /* Tenta manter linhas juntas */
-        }
-        .table th, .table td {
-            padding: 4px 5px;
-            border: 1px solid #ccc; /* Adiciona borda para clareza */
-        }
-
-        /* Garante que o cabeçalho da tabela repita em novas páginas */
-        thead {
-            display: table-header-group;
-        }
-        /* Garante que o rodapé da tabela (com o total) seja impresso */
-        tfoot {
-            display: table-footer-group;
-            font-weight: bold;
-            font-size: 10pt;
-        }
-        
-        /* Remove o scroll da tabela de detalhe */
-        .table-responsive {
-            max-height: none !important;
-            overflow-y: visible !important;
-        }
-        
-        /* Ajuste fino nos cards (para a tabela de detalhe) */
-        .card {
-            border: none !important; /* Remove borda do card */
-            box-shadow: none !important;
-        }
-        
-        /* Esconde o cabeçalho do card que contém o botão de imprimir */
-        #print-area > .card-header {
-             display: none;
-        }
-    }
-    /* ======================================================= */
-    /* FIM DA CORREÇÃO (Impressão A4 - Retrato)       */
-    /* ======================================================= */
-</style>
-{% endblock %}
+{% block title %}Relatórios de Vendas - Sistema de Caixa{% endblock %}
 
 {% block content %}
-
-{# Define a data de hoje (padrão do filtro) para comparação #}
-{% set hoje_str = now.strftime('%Y-%m-%d') %}
-
-{# Define a flag 'filtro_ativo' #}
-{% set filtro_ativo = (caixa_selecionado > 0) or 
-                       (forma_pgto_selecionada != 'todos') or 
-                       (data_inicio != hoje_str) or 
-                       (data_fim != hoje_str) %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom no-print">
-    <h1 class="h2"><i class="fas fa-chart-bar"></i> Relatórios</h1>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-chart-line"></i> Relatórios de Vendas e Pagamentos</h1>
 </div>
 
-<div class="card mb-4 no-print">
-    <div class="card-body">
-        <form method="GET" action="{{ url_for('relatorios') }}" class="row g-3 align-items-end">
-            <div class="col-md-2">
-                <label for="inicio" class="form-label">Data de Início</label>
-                <input type="date" class="form-control" id="inicio" name="inicio" value="{{ data_inicio }}">
-            </div>
-            <div class="col-md-2">
-                <label for="fim" class="form-label">Data de Fim</label>
-                <input type="date" class="form-control" id="fim" name="fim" value="{{ data_fim }}">
-            </div>
-            <div class="col-md-2">
-                <label for="caixa_id" class="form-label">Filtrar por Caixa</label>
-                <select class="form-select" id="caixa_id" name="caixa_id">
-                    <option value="0" {% if caixa_selecionado == 0 %}selected{% endif %}>
-                        Geral (Todos os Caixas)
-                    </option>
-                    {% for caixa in caixas %}
-                    <option value="{{ caixa.id }}" {% if caixa_selecionado == caixa.id %}selected{% endif %}>
-                        {{ caixa.nome }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label for="forma_pgto" class="form-label">Forma de Pagamento</label>
-                <select class="form-select" id="forma_pgto" name="forma_pgto">
-                    <option value="todos" {% if forma_pgto_selecionada == 'todos' %}selected{% endif %}>Todas</option>
-                    <option value="dinheiro" {% if forma_pgto_selecionada == 'dinheiro' %}selected{% endif %}>Dinheiro</option>
-                    <option value="cartao" {% if forma_pgto_selecionada == 'cartao' %}selected{% endif %}>Cartão</option>
-                    <option value="pix" {% if forma_pgto_selecionada == 'pix' %}selected{% endif %}>PIX</option>
-                </select>
-            </div>
-            
-            <div class="col-md-2 d-grid">
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-filter"></i> Filtrar
-                </button>
-            </div>
-            
-            <div class="col-md-2 d-grid">
-                <a href="{{ url_for('exportar_relatorio', inicio=data_inicio, fim=data_fim, caixa_id=caixa_selecionado, forma_pgto=forma_pgto_selecionada) }}" 
-                   class="btn btn-success">
-                    <i class="fas fa-file-excel"></i> Exportar
-                </a>
-            </div>
-        </form>
-    </div>
-</div>
-
-<h2 class="print-only">Relatório de Vendas - {{ nome_filtro }}</h2>
-<p class="print-only" style="text-align: center; font-size: 1.1rem; margin-top: -15px;">
-    Período: {{ data_inicio }} até {{ data_fim }}
-</p>
-
-
-<div class="row mb-4 no-print"> <div class="col-md-4">
-        <div class="card stats-card bg-primary text-white">
-            <div class="card-body">
-                <h5 class="card-title">Total Vendido {% if filtro_ativo %}(Filtro){% endif %}</h5>
-                <h2 class="card-text">R$ {{ "%.2f"|format(total_vendido) }}</h2>
-            </div>
+<form method="GET" class="mb-4">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label for="data_inicio" class="form-label">Data Início:</label>
+            <input type="date" class="form-control" id="data_inicio" name="inicio" value="{{ data_inicio }}">
+        </div>
+        <div class="col-md-3">
+            <label for="data_fim" class="form-label">Data Fim:</label>
+            <input type="date" class="form-control" id="data_fim" name="fim" value="{{ data_fim }}">
+        </div>
+        <div class="col-md-3">
+            <label for="caixa_id" class="form-label">Caixa (Operador):</label>
+            <select class="form-select" id="caixa_id" name="caixa_id">
+                <option value="0" {% if caixa_selecionado == 0 %}selected{% endif %}>Todos os Caixas</option>
+                {% for caixa in caixas %}
+                <option value="{{ caixa.id }}" {% if caixa.id == caixa_selecionado %}selected{% endif %}>{{ caixa.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="forma_pgto" class="form-label">Forma de Pagamento (Filtro):</label>
+            <select class="form-select" id="forma_pgto" name="forma_pgto">
+                <option value="todos" {% if forma_pgto_selecionada == 'todos' %}selected{% endif %}>Todas as Formas</option>
+                <option value="dinheiro" {% if forma_pgto_selecionada == 'dinheiro' %}selected{% endif %}>Dinheiro</option>
+                <option value="cartao" {% if forma_pgto_selecionada == 'cartao' %}selected{% endif %}>Cartão</option>
+                <option value="pix" {% if forma_pgto_selecionada == 'pix' %}selected{% endif %}>PIX</option>
+                <option value="outros" {% if forma_pgto_selecionada == 'outros' %}selected{% endif %}>Outras Formas</option>
+            </select>
+        </div>
+        <div class="col-md-12 d-flex justify-content-end gap-2">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-filter"></i> Aplicar Filtro
+            </button>
+            <a href="{{ url_for('exportar_relatorio', inicio=data_inicio, fim=data_fim, caixa_id=caixa_selecionado, forma_pgto=forma_pgto_selecionada) }}" class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Exportar
+            </a>
+            <!-- NOVO BOTÃO para o Relatório de Recebimentos Consolidados -->
+            <a href="{{ url_for('relatorio_recebimentos_consolidados', inicio=data_inicio, fim=data_fim, caixa_id=caixa_selecionado) }}" class="btn btn-info text-white">
+                <i class="fas fa-dollar-sign"></i> Recebimentos Consolidados
+            </a>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card stats-card bg-success text-white">
-            <div class="card-body">
-                <h5 class="card-title">Nº de Vendas {% if filtro_ativo %}(Filtro){% endif %}</h5>
-                <h2 class="card-text">{{ num_vendas }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card stats-card bg-info text-white">
-            <div class="card-body">
-                <h5 class="card-title">Ticket Médio {% if filtro_ativo %}(Filtro){% endif %}</h5>
-                <h2 class="card-text">R$ {{ "%.2f"|format(ticket_medio) }}</h2>
-            </div>
-        </div>
-    </div>
-</div>
+</form>
 
 <div class="row">
-    <div class="col-md-5 no-print"> <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-star"></i> Top 10 Produtos Mais Vendidos</h5>
-            </div>
+    <!-- Resumo de Vendas (Mantido) -->
+    <div class="col-md-4 mb-4">
+        <div class="card text-white bg-primary">
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead class="table-dark">
-                            <tr>
-                                <th scope="col">Produto</th>
-                                <th scope="col">Qtd.</th>
-                                <th scope="col">Total (R$)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for produto in produtos_vendidos %}
-                            <tr>
-                                <td>{{ produto.nome }}</td>
-                                <td>{{ produto.total_quantidade }}</td>
-                                <td>R$ {{ "%.2f"|format(produto.total_arrecadado) }}</td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="3" class="text-center">Nenhum produto vendido no período.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-uppercase mb-0">Total Vendido</h6>
+                        <h4 class="mb-0">R$ {{ "%.2f"|format(total_vendido) }}</h4>
+                    </div>
+                    <i class="fas fa-money-bill-wave fa-3x"></i>
                 </div>
             </div>
         </div>
     </div>
-
-    <div class="col-md-7"> <div class="card" id="print-area">
-            
-            <div class="card-header d-flex justify-content-between align-items-center no-print">
-                <h5><i class="fas fa-list-ul"></i> Detalhamento - {{ nome_filtro }}</h5>
-                <button onclick="window.print()" class="btn btn-sm btn-outline-secondary no-print">
-                    <i class="fas fa-print"></i> Imprimir
-                </button>
-            </div>
+    <div class="col-md-4 mb-4">
+        <div class="card text-white bg-secondary">
             <div class="card-body">
-                <h5 class="print-only" style="font-size: 1.2rem; text-align: left; margin-bottom: 10px; visibility: visible;">
-                    Detalhamento de Itens Vendidos
-                </h5>
-                
-                <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
-                    <table class="table table-striped table-hover">
-                        <thead class="table-dark">
-                            <tr>
-                                <th scope="col">Nº Cupom</th>
-                                <th scope="col">Data/Hora</th>
-                                <th scope="col">Produto</th>
-                                <th scope="col">Qtd.</th>
-                                <th scope="col">Subtotal (R$)</th>
-                                <th scope="col">Forma Pgto.</th>
-                                <th scope="col">Operador</th>
-                                <th scope="col" class="no-print">Ação</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in itens_vendidos_detalhe %}
-                            <tr class="{% if item.venda.status == 'cancelada' %}table-danger{% endif %}">
-                                <td><strong>{{ item.venda.numero_venda }}</strong></td>
-                                <td>{{ item.venda.data_venda.strftime('%d/%m %H:%M') }}</td>
-                                <td>{{ item.produto.nome }}</td>
-                                <td>{{ item.quantidade }}</td>
-                                <td>R$ {{ "%.2f"|format(item.subtotal) }}</td>
-                                <td>{{ item.venda.forma_pagamento|title }}</td>
-                                <td>{{ item.venda.operador.nome }}</td>
-                                <td class="no-print text-nowrap">
-                                    <a href="{{ url_for('cupom_venda', venda_id=item.venda.id) }}" 
-                                       target="_blank" class="btn btn-info btn-sm" title="Ver Cupom">
-                                        <i class="fas fa-receipt"></i>
-                                    </a>
-                                
-                                    {% if current_user.is_admin() %}
-                                        {% if item.venda.status != 'cancelada' %}
-                                            <button type="button" class="btn btn-warning btn-sm ms-1" 
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#modalEditarPgto"
-                                                    data-venda-id="{{ item.venda.id }}"
-                                                    data-venda-numero="{{ item.venda.numero_venda }}"
-                                                    data-forma-atual="{{ item.venda.forma_pagamento }}"
-                                                    title="Alterar Forma de Pagamento">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            
-                                            <button type="button" class="btn btn-danger btn-sm ms-1" 
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#modalCancelarVenda"
-                                                    data-venda-id="{{ item.venda.id }}"
-                                                    data-venda-numero="{{ item.venda.numero_venda }}"
-                                                    title="Cancelar Venda (Estorno)">
-                                                <i class="fas fa-ban"></i>
-                                            </button>
-                                        {% else %}
-                                            <span class="badge bg-danger ms-1">CANCELADA</span>
-                                        {% endif %}
-                                    {% endif %}
-                                    
-                                    {% if not current_user.is_admin() and item.venda.status == 'cancelada' %}
-                                        <span class="badge bg-danger ms-1">CANCELADA</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-uppercase mb-0">Total de Vendas</h6>
+                        <h4 class="mb-0">{{ num_vendas }}</h4>
+                    </div>
+                    <i class="fas fa-receipt fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card text-white bg-dark">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-uppercase mb-0">Ticket Médio</h6>
+                        <h4 class="mb-0">R$ {{ "%.2f"|format(ticket_medio) }}</h4>
+                    </div>
+                    <i class="fas fa-calculator fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs" id="relatoriosTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="vendas-tab" data-bs-toggle="tab" data-bs-target="#vendas" type="button" role="tab" aria-controls="vendas" aria-selected="true">
+            <i class="fas fa-list"></i> Detalhe de Vendas
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="produtos-tab" data-bs-toggle="tab" data-bs-target="#produtos" type="button" role="tab" aria-controls="produtos" aria-selected="false">
+            <i class="fas fa-chart-simple"></i> Top 10 Produtos
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="pagamentos-tab" data-bs-toggle="tab" data-bs-target="#pagamentos" type="button" role="tab" aria-controls="pagamentos" aria-selected="false">
+            <i class="fas fa-credit-card"></i> Pagamentos Agrupados (Geral)
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="relatoriosTabContent">
+    
+    <!-- Tab 1: Detalhe de Vendas (Mantida) -->
+    <div class="tab-pane fade show active" id="vendas" role="tabpanel" aria-labelledby="vendas-tab">
+        <h5 class="mt-3">Vendas Detalhadas no Período ({{ nome_filtro }})</h5>
+        <div class="table-responsive">
+            <table class="table table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>Nº Venda</th>
+                        <th>Data/Hora</th>
+                        <th>Operador</th>
+                        <th>Itens (Qtd)</th>
+                        <th>Valor Total</th>
+                        <th>Valor Pago</th>
+                        <th>Troco</th>
+                        <th>Formas Pgto</th>
+                        <th>Status</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in itens_vendidos_detalhe %}
+                    <tr>
+                        <td><a href="{{ url_for('cupom_venda', venda_id=item.venda.id) }}" target="_blank" class="fw-bold text-decoration-none">{{ item.venda.numero_venda }}</a></td>
+                        <td>{{ item.venda.data_venda.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>{{ item.venda.operador.nome }}</td>
+                        <td>{{ item.produto.nome }} ({{ item.quantidade }})</td>
+                        <td class="text-nowrap">R$ {{ "%.2f"|format(item.venda.valor_total) }}</td>
+                        <td class="text-nowrap">R$ {{ "%.2f"|format(item.venda.valor_pago) }}</td>
+                        <td class="text-nowrap">R$ {{ "%.2f"|format(item.venda.troco) }}</td>
+                        <td>{{ item.venda.formas_pagamento_usadas }}</td>
+                        <td>
+                            {% if item.venda.status == 'cancelada' %}
+                            <span class="badge bg-danger">Cancelada</span>
                             {% else %}
-                            <tr>
-                                <td colspan="8" class="text-center">Nenhum item vendido no período.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                        <tfoot>
-                            <tr class="fw-bold" style="font-size: 1.1rem; border-top: 2px solid #333;">
-                                <td colspan="4" class="text-end">
-                                    TOTAL VENDIDO {% if filtro_ativo %}(Filtro){% endif %}:
-                                </td>
-                                <td>R$ {{ "%.2f"|format(total_vendido) }}</td>
-                                <td></td>
-                                <td></td>
-                                <td class="no-print"></td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            </div>
+                            <span class="badge bg-success">Finalizada</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if item.venda.status != 'cancelada' %}
+                            <form action="{{ url_for('vendas_cancelar', venda_id=item.venda.id, inicio=data_inicio, fim=data_fim, caixa_id=caixa_selecionado, forma_pgto=forma_pgto_selecionada) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja cancelar a Venda #{{ item.venda.numero_venda }}? Isso irá reverter o estoque e não pode ser desfeito!');" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-danger" title="Cancelar Venda">
+                                    <i class="fas fa-undo"></i> Estornar
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Tab 2: Top 10 Produtos (Mantida) -->
+    <div class="tab-pane fade" id="produtos" role="tabpanel" aria-labelledby="produtos-tab">
+        <h5 class="mt-3">Top 10 Produtos Mais Vendidos ({{ nome_filtro }})</h5>
+        <div class="table-responsive">
+            <table class="table table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Cód. Barras</th>
+                        <th>Total Vendido (R$)</th>
+                        <th>Total em Unidades</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for produto in produtos_vendidos %}
+                    <tr>
+                        <td>{{ produto.nome }}</td>
+                        <td>{{ produto.codigo_barras }}</td>
+                        <td class="text-nowrap">R$ {{ "%.2f"|format(produto.total_arrecadado) }}</td>
+                        <td>{{ produto.total_quantidade }} un.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Tab 3: Pagamentos Agrupados (Mantida e Melhorada) -->
+    <div class="tab-pane fade" id="pagamentos" role="tabpanel" aria-labelledby="pagamentos-tab">
+        <h5 class="mt-3">Totais Agrupados por Forma de Pagamento ({{ nome_filtro }})</h5>
+        <div class="table-responsive">
+            <table class="table table-striped table-sm w-50">
+                <thead>
+                    <tr>
+                        <th>Forma de Pagamento</th>
+                        <th class="text-end">Total Recebido (R$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set total_recebido_geral = 0 %}
+                    {% for forma, total in pagamentos_agrupados %}
+                    <tr>
+                        <td>
+                            <i class="{% if forma == 'dinheiro' %}fas fa-money-bill-wave{% elif forma == 'cartao' %}fas fa-credit-card{% elif forma == 'pix' %}fas fa-qrcode{% else %}fas fa-wallet{% endif %} me-2"></i>
+                            {{ forma.title() }}
+                        </td>
+                        <td class="text-end fw-bold text-success">R$ {{ "%.2f"|format(total) }}</td>
+                    </tr>
+                    {% set total_recebido_geral = total_recebido_geral + total %}
+                    {% endfor %}
+                    <tr>
+                        <td class="fw-bold bg-light">TOTAL DE RECEBIMENTOS (VENDAS FINALIZADAS)</td>
+                        <td class="text-end fw-bold bg-light text-primary">R$ {{ "%.2f"|format(total_recebido_geral) }}</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="modalEditarPgto" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning">
-                <h5 class="modal-title text-dark"><i class="fas fa-edit"></i> Alterar Forma de Pagamento</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="formEditarPgto" method="POST" 
-                  action="{{ url_for('relatorios', inicio=data_inicio, fim=data_fim, caixa_id=caixa_selecionado, forma_pgto=forma_pgto_selecionada) }}">
-                <div class="modal-body">
-                    <p>Alterando venda: <strong id="lblVendaNumero"></strong></p>
-                    
-                    <div class="mb-3">
-                        <label for="nova_forma_pagamento" class="form-label">Nova Forma de Pagamento:</label>
-                        <select class="form-select" name="nova_forma_pagamento" id="nova_forma_pagamento" required>
-                            <option value="dinheiro">Dinheiro</option>
-                            <option value="cartao">Cartão</option>
-                            <option value="pix">PIX</option>
-                        </select>
-                    </div>
-                    <div class="alert alert-warning py-2" style="font-size: 0.9rem;">
-                        <i class="fas fa-exclamation-triangle"></i> Atenção: Isso afetará o fechamento de caixa do dia desta venda.
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar Alteração</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalCancelarVenda" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Cancelar Venda</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="formCancelarVenda" method="POST" 
-                  action="{{ url_for('relatorios', inicio=data_inicio, fim=data_fim, caixa_id=caixa_selecionado, forma_pgto=forma_pgto_selecionada) }}">
-                <div class="modal-body">
-                    <p class="lead">Tem certeza que deseja cancelar a venda <strong id="lblCancelVendaNumero"></strong>?</p>
-                    
-                    <div class="alert alert-warning">
-                        <ul class="mb-0">
-                            <li>O status mudará para <strong>Cancelada</strong>.</li>
-                            <li>Os itens voltarão para o <strong>Estoque</strong> automaticamente.</li>
-                            <li>O valor será subtraído do total de vendas.</li>
-                        </ul>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Não, voltar</button>
-                    <button type="submit" class="btn btn-danger">Sim, Cancelar Venda</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-{% endblock %}
-
-
-{% block extra_js %}
-<script>
-    // --- SCRIPT PARA MODAL DE EDIÇÃO DE PAGAMENTO ---
-    var modalEditarPgto = document.getElementById('modalEditarPgto');
-    if (modalEditarPgto) {
-        modalEditarPgto.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            var vendaId = button.getAttribute('data-venda-id');
-            var vendaNumero = button.getAttribute('data-venda-numero');
-            var formaAtual = button.getAttribute('data-forma-atual');
-            
-            var lblNumero = modalEditarPgto.querySelector('#lblVendaNumero');
-            var selectForma = modalEditarPgto.querySelector('#nova_forma_pagamento');
-            var form = modalEditarPgto.querySelector('#formEditarPgto');
-            
-            lblNumero.textContent = vendaNumero;
-            selectForma.value = formaAtual;
-            
-            var baseUrl = form.getAttribute('action');
-            form.action = '/vendas/editar_pagamento/' + vendaId + baseUrl.substring(baseUrl.indexOf('?'));
-        });
-    }
-
-    // --- SCRIPT PARA MODAL DE CANCELAMENTO DE VENDA (NOVO) ---
-    var modalCancelarVenda = document.getElementById('modalCancelarVenda');
-    if (modalCancelarVenda) {
-        modalCancelarVenda.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            var vendaId = button.getAttribute('data-venda-id');
-            var vendaNumero = button.getAttribute('data-venda-numero');
-            
-            var lblNumero = modalCancelarVenda.querySelector('#lblCancelVendaNumero');
-            lblNumero.textContent = vendaNumero;
-            
-            var form = modalCancelarVenda.querySelector('#formCancelarVenda');
-            
-            // Preserva os filtros da URL atual
-            var baseUrl = form.getAttribute('action');
-            // Verifica se há query string
-            var queryParams = baseUrl.indexOf('?') !== -1 ? baseUrl.substring(baseUrl.indexOf('?')) : '';
-            
-            // Monta a rota correta
-            form.action = '/vendas/cancelar/' + vendaId + queryParams;
-        });
-    }
-</script>
 {% endblock %}

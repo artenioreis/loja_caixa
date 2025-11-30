@@ -191,55 +191,90 @@
         </div>
     </div>
 </div>
+
 <div class="modal fade" id="modalFinalizar" tabindex="-1" aria-labelledby="modalFinalizarLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
+    <div class="modal-dialog modal-xl"> <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title" id="modalFinalizarLabel"><i class="fas fa-check"></i> Finalizar Venda</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="forma_pagamento" class="form-label">Forma de Pagamento:</label>
-                            <select class="form-select form-select-lg" id="forma_pagamento">
-                                <option value="dinheiro">Dinheiro</option>
-                                <option value="cartao">Cartão</option>
-                                <option value="pix">PIX</option>
-                            </select>
+                    <div class="col-md-6 border-end">
+                        <h4 class="mb-3"><i class="fas fa-credit-card"></i> Adicionar Pagamento</h4>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label for="forma_pagamento_add" class="form-label">Forma de Pagamento:</label>
+                                <select class="form-select" id="forma_pagamento_add">
+                                    <option value="dinheiro">Dinheiro</option>
+                                    <option value="cartao">Cartão</option>
+                                    <option value="pix">PIX</option>
+                                    <option value="transferencia">Transferência</option>
+                                    <option value="cheque">Cheque</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label for="valor_pagamento_add" class="form-label">Valor (R$):</label>
+                                <input type="number" step="0.01" class="form-control" id="valor_pagamento_add" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="d-grid mb-4">
+                            <button class="btn btn-info" id="btn-adicionar-pagamento">
+                                <i class="fas fa-plus"></i> Adicionar Pagamento
+                            </button>
                         </div>
                         
-                        <div class="mb-3" id="campo-valor-pago">
-                            <label for="valor_pago" class="form-label">Valor Pago (R$):</label>
-                            <input type="number" step="0.01" class="form-control form-control-lg" id="valor_pago" placeholder="0.00">
+                        <h5 class="mb-3"><i class="fas fa-file-invoice"></i> Pagamentos Registrados</h5>
+                        <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                            <table class="table table-striped table-sm mb-0">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>Forma</th>
+                                        <th>Valor (R$)</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pagamentos-tbody">
+                                    </tbody>
+                            </table>
                         </div>
-                        
-                        <div class="mb-3 text-center" id="campo-pix-qrcode" style="display: none;">
-                            <label class="form-label fw-bold">Pague com PIX</label>
+
+                        <div class="alert alert-info mt-3" id="campo-pix-qrcode" style="display: none;">
+                            <p class="mb-1 fw-bold">Pague com PIX</p>
                             <p class="text-muted" style="font-size: 0.9rem;">
-                                Aponte a câmera para o QR Code e digite o valor total (R$ <span id="modal-total-pix">0.00</span>).
+                                Aponte a câmera para o QR Code (Valor Pix: R$ <span id="modal-total-pix">0.00</span>).
                             </p>
-                            
                             <img src="{{ url_for('static', filename='images/qrcode_pix_loja.png') }}" 
                                  alt="QR Code PIX da Loja" 
                                  class="img-fluid rounded border" 
-                                 style="max-width: 250px;">
+                                 style="max-width: 150px;">
                         </div>
+
                     </div>
                     
-                    <div class="col-md-6 bg-light p-4 rounded">
-                        <h3>Total a Pagar:</h3>
-                        <h1 id="modal-total-venda" class="display-5 fw-bold text-success">R$ 0.00</h1>
-                        <hr>
-                        <h3>Troco:</h3>
-                        <h1 id="modal-troco" class="display-6 fw-bold text-primary">R$ 0.00</h1>
+                    <div class="col-md-6 bg-light p-4 rounded d-flex flex-column justify-content-between">
+                        <div>
+                            <h3 class="mb-3 text-secondary">Total da Venda:</h3>
+                            <h1 id="modal-total-venda" class="display-5 fw-bold text-dark">R$ 0.00</h1>
+                            <hr>
+                            
+                            <h3 class="mb-3 text-secondary">Total Pago:</h3>
+                            <h1 id="modal-total-pago" class="display-5 fw-bold text-success">R$ 0.00</h1>
+                            <hr>
+
+                            <h3 class="mb-3 text-secondary">Troco:</h3>
+                            <h1 id="modal-troco" class="display-6 fw-bold text-primary">R$ 0.00</h1>
+                        </div>
+                        <div class="alert mt-3" id="alerta-status">
+                            Verifique se o valor pago é suficiente.
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Voltar</button>
-                <button type="button" class="btn btn-success btn-lg" id="btn-confirmar-venda">
+                <button type="button" class="btn btn-success btn-lg" id="btn-confirmar-venda" disabled>
                     <i class="fas fa-save"></i> Confirmar Venda
                 </button>
             </div>
@@ -256,7 +291,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // VARIÁVEIS DE ESTADO
     // =========================================================================
     let carrinho = []; // Armazena os itens da venda ( [{id, nome, preco, qtd, subtotal}, ...] )
-    let produtoAtual = null; // Armazena o último produto buscado
+    let pagamentos = []; // NOVO: Armazena os pagamentos [ {forma_pagamento: 'dinheiro', valor: 15.00}, ...]
+    let produtoAtual = null; 
     
     // =========================================================================
     // ELEMENTOS DOM
@@ -271,29 +307,27 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnFinalizar = document.getElementById('btn-finalizar');
     const btnCancelar = document.getElementById('btn-cancelar');
     
-    // --- Modal Finalizar (Existente) ---
-    const modalFinalizarVenda = new bootstrap.Modal(document.getElementById('modalFinalizar'));
-    const modalTotalVenda = document.getElementById('modal-total-venda');
-    const modalTroco = document.getElementById('modal-troco');
-    const selectFormaPagamento = document.getElementById('forma_pagamento');
-    const inputValorPago = document.getElementById('valor_pago');
-    const campoValorPago = document.getElementById('campo-valor-pago');
-    const btnConfirmarVenda = document.getElementById('btn-confirmar-venda');
-    
-    // --- Elementos PIX (Existente) ---
-    const campoPixQrcode = document.getElementById('campo-pix-qrcode');
-    const modalTotalPix = document.getElementById('modal-total-pix');
-
-    // =========================================================================
-    //           INÍCIO DOS NOVOS ELEMENTOS (MODAL DE BUSCA)
-    // =========================================================================
+    // --- Modal Buscar Produto ---
     const modalBusca = new bootstrap.Modal(document.getElementById('modalBuscarProduto'));
     const inputBuscaNome = document.getElementById('input-busca-nome');
     const listaResultadosBusca = document.getElementById('lista-resultados-busca');
-    let buscaTypingTimer; // Timer para o debounce da busca por nome
-    // =========================================================================
-    //             FIM DOS NOVOS ELEMENTOS
-    // =========================================================================
+    let buscaTypingTimer; 
+    
+    // --- Modal Finalizar (NOVOS e REFATORADOS) ---
+    const modalFinalizarVenda = new bootstrap.Modal(document.getElementById('modalFinalizar'));
+    const modalTotalVenda = document.getElementById('modal-total-venda');
+    const modalTotalPago = document.getElementById('modal-total-pago'); // NOVO
+    const modalTroco = document.getElementById('modal-troco');
+    const btnConfirmarVenda = document.getElementById('btn-confirmar-venda');
+    const alertaStatus = document.getElementById('alerta-status');
+
+    // --- Campos de Adição de Pagamento (NOVOS) ---
+    const selectFormaPagamentoAdd = document.getElementById('forma_pagamento_add');
+    const inputValorPagamentoAdd = document.getElementById('valor_pagamento_add');
+    const btnAdicionarPagamento = document.getElementById('btn-adicionar-pagamento');
+    const pagamentosTbody = document.getElementById('pagamentos-tbody');
+    const campoPixQrcode = document.getElementById('campo-pix-qrcode');
+    const modalTotalPix = document.getElementById('modal-total-pix');
 
     // =========================================================================
     // FUNÇÕES PRINCIPAIS
@@ -371,19 +405,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Verifica se o item já está no carrinho
         const itemExistente = carrinho.find(item => item.id === produtoAtual.id);
+        const estoqueAtual = produtoAtual.estoque_atual;
 
         if (itemExistente) {
-            // Apenas atualiza a quantidade
+             // 1. Verifica se a soma total não excede o estoque
+             if (itemExistente.qtd + quantidade > estoqueAtual) {
+                 alert(`Estoque insuficiente. Tentativa: ${itemExistente.qtd + quantidade}, Disponível: ${estoqueAtual}`);
+                 return;
+             }
+             
+            // 2. Atualiza a quantidade
             itemExistente.qtd += quantidade;
             itemExistente.subtotal = itemExistente.preco * itemExistente.qtd;
+            
         } else {
+            // Validação de estoque para novo item
+            if (quantidade > estoqueAtual) {
+                 alert(`Estoque insuficiente para ${produtoAtual.nome}. Disponível: ${estoqueAtual}`);
+                 return;
+            }
+
             // Adiciona novo item
             carrinho.push({
                 id: produtoAtual.id,
                 nome: produtoAtual.nome,
                 preco: produtoAtual.preco_venda,
                 qtd: quantidade,
-                subtotal: produtoAtual.preco_venda * quantidade
+                subtotal: produtoAtual.preco_venda * quantidade,
+                estoque_atual: estoqueAtual 
             });
         }
         
@@ -392,7 +441,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
-     * Redesenha a tabela do carrinho e os totais (COM INPUT EDITÁVEL)
+     * Redesenha a tabela do carrinho e os totais
      */
     function renderizarCarrinho() {
         carrinhoTbody.innerHTML = ''; // Limpa a tabela
@@ -413,6 +462,7 @@ document.addEventListener('DOMContentLoaded', function() {
                            class="form-control form-control-sm text-center" 
                            value="${item.qtd}" 
                            min="1" 
+                           max="${item.estoque_atual}"
                            onchange="atualizarQuantidadeItem(${item.id}, this.value)">
                 </td>
                 <td>R$ ${item.preco.toFixed(2)}</td>
@@ -430,11 +480,11 @@ document.addEventListener('DOMContentLoaded', function() {
         totalItensSpan.textContent = totalItens;
         totalVendaSpan.textContent = `R$ ${totalVenda.toFixed(2)}`;
         
-        // Atualiza o modal
-        modalTotalVenda.textContent = `R$ ${totalVenda.toFixed(2)}`;
-        
         // Habilita/desabilita botão de finalizar
         btnFinalizar.disabled = carrinho.length === 0;
+
+        // Sempre que o carrinho muda, atualiza o modal de pagamentos
+        renderizarPagamentos();
     }
 
     /**
@@ -443,15 +493,22 @@ document.addEventListener('DOMContentLoaded', function() {
     window.atualizarQuantidadeItem = function(produtoId, novaQuantidade) {
         const qtd = parseInt(novaQuantidade);
         
-        // Validação básica
+        // Encontra o item no array do carrinho
+        const item = carrinho.find(item => item.id === produtoId);
+
+        // Validação de estoque e quantidade
         if (isNaN(qtd) || qtd <= 0) {
             alert("A quantidade deve ser maior que zero.");
-            renderizarCarrinho(); // Restaura o valor antigo na tela
+            renderizarCarrinho(); 
             return;
         }
 
-        // Encontra o item no array do carrinho
-        const item = carrinho.find(item => item.id === produtoId);
+        if (item && qtd > item.estoque_atual) {
+             alert(`Estoque insuficiente. Tentativa: ${qtd}, Disponível: ${item.estoque_atual}`);
+             renderizarCarrinho();
+             return;
+        }
+
 
         if (item) {
             // Atualiza quantidade e recalcula subtotal
@@ -483,82 +540,149 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
-     * Limpa toda a venda
+     * Limpa toda a venda (carrinho e pagamentos)
      */
     function cancelarVenda() {
-        if (carrinho.length > 0 && confirm('Tem certeza que deseja cancelar a venda atual?')) {
-            carrinho = [];
-            renderizarCarrinho();
-            limparFormularioProduto();
-        }
-    }
-    
-    /**
-     * Lógica do modal de finalização (FUNÇÃO ATUALIZADA COM PIX)
-     */
-    function atualizarModalPagamento() {
-        const totalVenda = parseFloat(carrinho.reduce((acc, item) => acc + item.subtotal, 0));
-        const valorPago = parseFloat(inputValorPago.value) || 0;
-        
-        let troco = 0;
-        
-        // Atualiza o valor total no modal (para ambos os lados)
-        modalTotalVenda.textContent = `R$ ${totalVenda.toFixed(2)}`; // ATUALIZADO
-        modalTotalPix.textContent = totalVenda.toFixed(2);
-        
-        // Esconde ambos os campos dinâmicos por padrão
-        campoValorPago.style.display = 'none';
-        campoPixQrcode.style.display = 'none';
-        
-        // Verifica a forma de pagamento selecionada
-        if (selectFormaPagamento.value === 'dinheiro') {
-            campoValorPago.style.display = 'block'; // Mostra campo "Valor Pago"
-            if (valorPago > 0) {
-                 troco = valorPago - totalVenda;
+        if (carrinho.length > 0 || pagamentos.length > 0) {
+            if (confirm('Tem certeza que deseja cancelar a venda atual?')) {
+                carrinho = [];
+                pagamentos = []; // Limpa também os pagamentos
+                renderizarCarrinho();
+                limparFormularioProduto();
+                renderizarPagamentos();
+                modalFinalizarVenda.hide();
             }
-        
-        } else if (selectFormaPagamento.value === 'pix') {
-            campoPixQrcode.style.display = 'block'; // Mostra campo "QR Code"
-            // Se for PIX, o valor pago é o total da venda e não há troco
-            inputValorPago.value = totalVenda.toFixed(2);
-            troco = 0;
-        
-        } else {
-            // 'cartao' ou outro
-            // Se for cartão, o valor pago é o total da venda e não há troco
-            inputValorPago.value = totalVenda.toFixed(2);
-            troco = 0;
+        }
+    }
+
+    // =========================================================================
+    // NOVO: Lógica de Múltiplos Pagamentos
+    // =========================================================================
+    
+    function adicionarPagamento() {
+        const forma = selectFormaPagamentoAdd.value;
+        const valor = parseFloat(inputValorPagamentoAdd.value);
+
+        if (isNaN(valor) || valor <= 0) {
+            alert('Por favor, insira um valor válido para o pagamento.');
+            return;
         }
         
-        modalTroco.textContent = `R$ ${troco.toFixed(2)}`;
+        const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
+        const totalPagoAtual = pagamentos.reduce((acc, p) => acc + p.valor, 0);
         
-        if (troco < 0) {
-            modalTroco.classList.add('text-danger');
-            modalTroco.classList.remove('text-primary');
-        } else {
-            modalTroco.classList.remove('text-danger');
+        // Adiciona o novo pagamento à lista
+        pagamentos.push({
+            forma_pagamento: forma,
+            valor: parseFloat(valor.toFixed(2)) // Arredonda para 2 casas
+        });
+        
+        // Limpa os inputs de pagamento
+        inputValorPagamentoAdd.value = '';
+        selectFormaPagamentoAdd.value = 'dinheiro';
+        
+        renderizarPagamentos();
+        
+        // Foca no campo de valor, sugerindo o valor restante
+        const novoTotalPago = pagamentos.reduce((acc, p) => acc + p.valor, 0);
+        const novoValorRestante = Math.max(0, totalVenda - novoTotalPago);
+        inputValorPagamentoAdd.value = novoValorRestante.toFixed(2);
+        inputValorPagamentoAdd.focus();
+        inputValorPagamentoAdd.select();
+    }
+
+    function renderizarPagamentos() {
+        pagamentosTbody.innerHTML = '';
+        let totalPago = 0;
+        let totalPix = 0;
+        
+        const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
+        const totalVendaArredondado = parseFloat(totalVenda.toFixed(2));
+
+        pagamentos.forEach((pagamento, index) => {
+            totalPago += pagamento.valor;
+            if (pagamento.forma_pagamento === 'pix') {
+                totalPix += pagamento.valor;
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${pagamento.forma_pagamento.charAt(0).toUpperCase() + pagamento.forma_pagamento.slice(1)}</td>
+                <td>R$ ${pagamento.valor.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="removerPagamento(${index})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            pagamentosTbody.appendChild(tr);
+        });
+        
+        const totalPagoArredondado = parseFloat(totalPago.toFixed(2));
+        let troco = totalPagoArredondado - totalVendaArredondado;
+
+        // Atualiza a seção de resumo
+        modalTotalVenda.textContent = `R$ ${totalVendaArredondado.toFixed(2)}`;
+        modalTotalPago.textContent = `R$ ${totalPagoArredondado.toFixed(2)}`;
+        modalTroco.textContent = `R$ ${Math.max(0, troco).toFixed(2)}`;
+        modalTroco.classList.remove('text-danger', 'text-primary');
+
+        // Atualiza status e botão de confirmação
+        if (totalVendaArredondado === 0) {
+            btnConfirmarVenda.disabled = true;
+            alertaStatus.className = 'alert alert-danger mt-3';
+            alertaStatus.textContent = 'Adicione itens ao carrinho para finalizar a venda.';
+        } else if (totalPagoArredondado >= totalVendaArredondado) {
+            btnConfirmarVenda.disabled = false;
+            alertaStatus.className = 'alert alert-success mt-3';
+            alertaStatus.innerHTML = `<i class="fas fa-check-circle"></i> **Pagamento Suficiente.** Troco: R$ ${Math.max(0, troco).toFixed(2)}`;
             modalTroco.classList.add('text-primary');
+        } else {
+            btnConfirmarVenda.disabled = true;
+            alertaStatus.className = 'alert alert-warning mt-3';
+            alertaStatus.innerHTML = `<i class="fas fa-exclamation-triangle"></i> **Pagamento Insuficiente.** Faltam: R$ ${(totalVendaArredondado - totalPagoArredondado).toFixed(2)}`;
+            modalTroco.classList.add('text-danger');
+        }
+        
+        // Lógica de exibição do QR Code PIX (se houver pagamento PIX)
+        if (totalPix > 0) {
+            campoPixQrcode.style.display = 'block';
+            modalTotalPix.textContent = totalPix.toFixed(2);
+        } else {
+            campoPixQrcode.style.display = 'none';
         }
     }
     
-    /**
-     * Envia os dados da venda para o backend
-     */
+    window.removerPagamento = function(index) {
+        if (confirm('Tem certeza que deseja remover este pagamento?')) {
+             pagamentos.splice(index, 1);
+             renderizarPagamentos();
+        }
+    }
+
+    // =========================================================================
+    // Lógica de Envio da Venda (Finalizar)
+    // =========================================================================
     async function finalizarVenda() {
         const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
-        const valorPago = parseFloat(inputValorPago.value);
-        const formaPagamento = selectFormaPagamento.value;
+        const totalPago = pagamentos.reduce((acc, p) => acc + p.valor, 0);
+        
+        // Última validação de segurança
+        if (carrinho.length === 0 || totalVenda <= 0) {
+            alert('Carrinho vazio ou valor zero.');
+            return;
+        }
 
-        if (formaPagamento === 'dinheiro' && valorPago < totalVenda) {
-            alert('Valor pago é menor que o total da venda.');
+        if (parseFloat(totalPago.toFixed(2)) < parseFloat(totalVenda.toFixed(2))) {
+            alert('Valor total pago é insuficiente para a venda.');
             return;
         }
 
         // Prepara os dados para enviar
         const dadosVenda = {
             itens: carrinho.map(item => ({ id: item.id, quantidade: item.qtd })),
-            forma_pagamento: formaPagamento,
-            valor_pago: valorPago
+            // NOVO: Envia a lista de pagamentos
+            pagamentos: pagamentos 
         };
         
         btnConfirmarVenda.disabled = true;
@@ -580,14 +704,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const result = await response.json();
             
+            // Exibe o troco, que virá na mensagem de sucesso
+            alert(result.success);
+
             // Abrir o cupom em nova janela
             window.open('/venda/cupom/' + result.venda_id, '_blank', 'width=500,height=700');
             
             // Limpa tudo
             carrinho = [];
+            pagamentos = []; // Limpa pagamentos
             renderizarCarrinho();
             limparFormularioProduto();
-            modalFinalizarVenda.hide(); // CORRIGIDO
+            modalFinalizarVenda.hide(); 
 
         } catch (error) {
             console.error('Erro ao finalizar venda:', error);
@@ -597,10 +725,9 @@ document.addEventListener('DOMContentLoaded', function() {
             btnConfirmarVenda.innerHTML = '<i class="fas fa-save"></i> Confirmar Venda';
         }
     }
-
     
     // =========================================================================
-    //           INÍCIO DAS NOVAS FUNÇÕES (BUSCA POR NOME)
+    // Funções de Busca por Nome (mantidas)
     // =========================================================================
 
     /**
@@ -699,8 +826,8 @@ document.addEventListener('DOMContentLoaded', function() {
         produtoAtual = {
             id: produto.id,
             nome: produto.nome,
-            preco_venda: produto.preco_venda
-            // os outros campos não são necessários para adicionarAoCarrinho
+            preco_venda: produto.preco_venda,
+            estoque_atual: produto.estoque_atual
         };
         
         // 2. Chama a função de adicionar ao carrinho
@@ -711,11 +838,6 @@ document.addEventListener('DOMContentLoaded', function() {
         modalBusca.hide();
     }
     
-    // =========================================================================
-    //           FIM DAS NOVAS FUNÇÕES
-    // =========================================================================
-
-
     // =========================================================================
     // EVENT LISTENERS
     // =========================================================================
@@ -729,7 +851,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Passa true para forçar a busca
             buscarProduto(true).then(() => {
                 if(produtoAtual) {
-                    adicionarAoCarrinho();
+                    // Aqui, em vez de adicionar direto, focamos no campo quantidade para ajuste.
+                    // Se o usuário pressionou enter no campo de código, ele quer o item no carrinho.
+                    if (document.activeElement.id === 'codigo_barras') {
+                        adicionarAoCarrinho();
+                    }
                 }
             });
         } else {
@@ -747,35 +873,44 @@ document.addEventListener('DOMContentLoaded', function() {
     inputQuantidade.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            adicionarAoCarrinho(); // CORRIGIDO (era adicionarAoVenda)
+            adicionarAoCarrinho(); 
         }
     });
     
     // Botões de ação
     btnCancelar.addEventListener('click', cancelarVenda);
     btnConfirmarVenda.addEventListener('click', finalizarVenda);
+    btnAdicionarPagamento.addEventListener('click', adicionarPagamento); // NOVO LISTENER
     
-    // Listeners do Modal
-    selectFormaPagamento.addEventListener('change', atualizarModalPagamento);
-    inputValorPago.addEventListener('input', atualizarModalPagamento);
+    // Lógica para adicionar pagamento com Enter no campo de valor do pagamento
+    inputValorPagamentoAdd.addEventListener('keydown', (e) => {
+         if (e.key === 'Enter') {
+             e.preventDefault();
+             adicionarPagamento();
+         }
+    });
     
-    // Atalhos do teclado (MODIFICADO)
+    // Atalhos do teclado 
     document.addEventListener('keydown', (e) => {
         
-        // ======================================================= //
-        //           INÍCIO DA NOVA LÓGICA (F2)                    //
-        // ======================================================= //
         if (e.key === 'F2') {
             e.preventDefault();
             modalBusca.show();
         }
-        // ======================================================= //
         
         if (e.key === 'F6') {
             e.preventDefault();
             if(carrinho.length > 0) {
-                atualizarModalPagamento(); 
-                modalFinalizarVenda.show(); // CORRIGIDO (era modal.show())
+                // Ao abrir, atualizamos o modal de pagamentos e a sugestão inicial
+                const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
+                inputValorPagamentoAdd.value = totalVenda.toFixed(2);
+                selectFormaPagamentoAdd.value = 'dinheiro'; // Sugere dinheiro como padrão
+                
+                // Limpa pagamentos anteriores, para que o PDV comece "limpo" a cada F6
+                pagamentos = [];
+                
+                renderizarPagamentos();
+                modalFinalizarVenda.show(); 
             }
         }
         if (e.key === 'F3') {
@@ -784,10 +919,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // =========================================================================
-    //           INÍCIO DOS NOVOS LISTENERS (MODAL DE BUSCA)
-    // =========================================================================
-    
     // Foca o input de busca quando o modal abrir
     document.getElementById('modalBuscarProduto').addEventListener('shown.bs.modal', function () {
         inputBuscaNome.focus();
@@ -798,6 +929,21 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('modalBuscarProduto').addEventListener('hidden.bs.modal', function () {
         inputBuscaNome.value = '';
         listaResultadosBusca.innerHTML = '<p class="text-center text-muted">Aguardando digitação (mín. 2 caracteres)...</p>';
+    });
+    
+    // Foco e sugestão de pagamento no modal de finalização ao abrir
+    document.getElementById('modalFinalizar').addEventListener('shown.bs.modal', function () {
+        const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
+        // Sugere o valor restante ou total da venda como primeiro pagamento
+        const totalPagoAtual = pagamentos.reduce((acc, p) => acc + p.valor, 0);
+        const valorRestante = Math.max(0, totalVenda - totalPagoAtual);
+        
+        inputValorPagamentoAdd.value = valorRestante.toFixed(2);
+        selectFormaPagamentoAdd.value = 'dinheiro'; // Sugere dinheiro como padrão
+        inputValorPagamentoAdd.focus();
+        inputValorPagamentoAdd.select();
+
+        renderizarPagamentos();
     });
 
     // Evento de digitação no input de busca (com debounce)
@@ -812,9 +958,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         buscaTypingTimer = setTimeout(buscarProdutoPorNome, 300); // 300ms de espera
     });
-    // =========================================================================
-    //           FIM DOS NOVOS LISTENERS
-    // =========================================================================
 
     // Inicializa a tela
     renderizarCarrinho();

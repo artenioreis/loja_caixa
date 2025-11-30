@@ -3,70 +3,84 @@
 {% block title %}Fechar Caixa - Sistema de Caixa{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-warning text-dark">
-                <h4><i class="fas fa-lock"></i> Fechar Caixa</h4>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-cash-register"></i> Fechamento de Caixa</h1>
+    <a href="{{ url_for('cupom_fechamento') }}" class="btn btn-secondary" target="_blank">
+        <i class="fas fa-print"></i> Imprimir Relatório de Conferência
+    </a>
+</div>
+
+<div class="alert alert-info">
+    Caixa aberto pelo usuário <strong>{{ caixa_aberto.usuario.nome }}</strong> em {{ caixa_aberto.data_abertura.strftime('%d/%m/%Y às %H:%M:%S') }}.
+    <p class="mb-0">Seu saldo inicial foi de: <strong class="text-primary">R$ {{ "%.2f"|format(caixa_aberto.saldo_inicial) }}</strong></p>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card bg-light mb-3 border-primary">
+            <div class="card-header h5 bg-primary text-white">Resumo Esperado (Sistema)</div>
+            <div class="card-body">
+                <p>Saldo Inicial no Caixa: <strong>R$ {{ "%.2f"|format(caixa_aberto.saldo_inicial) }}</strong></p>
+                <hr>
+                <h6 class="card-title">Detalhamento de Recebimentos:</h6>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <i class="fas fa-money-bill-wave me-2"></i> **Dinheiro (A Receber):** <span class="fw-bold text-success">R$ {{ "%.2f"|format(totais.dinheiro) }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <i class="fas fa-credit-card me-2"></i> Cartão (Crédito/Débito): 
+                        <span class="fw-bold text-success">R$ {{ "%.2f"|format(totais.cartao) }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <i class="fas fa-qrcode me-2"></i> PIX: 
+                        <span class="fw-bold text-success">R$ {{ "%.2f"|format(totais.pix) }}</span>
+                    </li>
+                    
+                    {% for forma, total in totais.items() %}
+                        {% if forma not in ['dinheiro', 'cartao', 'pix', 'total_geral'] %}
+                            <li class="list-group-item d-flex justify-content-between">
+                                <i class="fas fa-wallet me-2"></i> {{ forma.title() }}: 
+                                <span class="fw-bold text-success">R$ {{ "%.2f"|format(total) }}</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <li class="list-group-item d-flex justify-content-between list-group-item-info mt-2">
+                        <strong>Total Geral de Vendas:</strong>
+                        <strong class="text-primary">R$ {{ "%.2f"|format(totais.total_geral) }}</strong>
+                    </li>
+                </ul>
+                <hr>
+                <p>Total de Vendas Finalizadas: <strong>{{ total_vendas_count }}</strong></p>
+                <h4 class="mt-3 text-secondary">
+                    **SALDO ESPERADO EM DINHEIRO (Para Contagem Física):**
+                </h4>
+                <h3 class="fw-bold text-dark">R$ {{ "%.2f"|format(saldo_esperado_dinheiro) }}</h3>
             </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card border-danger">
+            <div class="card-header h5 bg-danger text-white">Fechamento e Conferência</div>
             <div class="card-body">
                 <form method="POST">
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h6>Resumo do Período</h6>
-                                    <p><strong>Data Abertura:</strong> {{ caixa_aberto.data_abertura.strftime('%d/%m/%Y %H:%M') }}</p>
-                                    <p><strong>Total de Vendas:</strong> {{ totais.total_vendas_count }}</p>
-                                    <hr>
-                                    <p class="mb-1"><strong>Vendas (Dinheiro):</strong> R$ {{ "%.2f"|format(totais.dinheiro) }}</p>
-                                    <p class="mb-1"><strong>Vendas (Cartão):</strong> R$ {{ "%.2f"|format(totais.cartao) }}</p>
-                                    <p class="mb-1"><strong>Vendas (PIX):</strong> R$ {{ "%.2f"|format(totais.pix) }}</p>
-                                    <hr>
-                                    <p><strong>Valor Vendido (Total):</strong> R$ {{ "%.2f"|format(totais.total_geral) }}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h6>Informações de Fechamento</h6>
-                                    <p><strong>Operador:</strong> {{ current_user.nome }}</p>
-                                    <p><strong>Data/Hora:</strong> {{ now.strftime('%d/%m/%Y %H:%M') }}</p>
-                                    <hr>
-                                    <p><strong>Saldo Inicial (Dinheiro):</strong> R$ {{ "%.2f"|format(caixa_aberto.saldo_inicial) }}</p>
-                                    <p><strong>+ Vendas (Dinheiro):</strong> R$ {{ "%.2f"|format(totais.dinheiro) }}</p>
-                                    <p class="fw-bold"><strong>Saldo Esperado (Dinheiro):</strong> R$ {{ "%.2f"|format(saldo_esperado_dinheiro) }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="mb-3">
-                        <label for="saldo_final" class="form-label">Saldo Final em Caixa (R$):</label>
-                        <input type="number" step="0.01" class="form-control" id="saldo_final" 
-                               name="saldo_final" required placeholder="Informe o valor total em dinheiro contado">
-                        <div class="form-text">
-                            Digite o valor total em <strong>dinheiro</strong> encontrado no caixa.
-                            Diferença: 
-                            <span id="diferenca" class="fw-bold">R$ 0.00</span>
-                        </div>
+                        <label for="saldo_final" class="form-label h4">Valor Total Contado (Dinheiro Físico):</label>
+                        <input type="number" step="0.01" class="form-control form-control-lg text-end" id="saldo_final" name="saldo_final" required placeholder="0.00">
                     </div>
                     
+                    <div id="conferencia-resultado" class="alert alert-light mt-3" style="display: none;">
+                        </div>
+
+                    <p class="text-muted mt-3">
+                        **Atenção:** O valor informado acima deve ser o valor total em dinheiro que está no caixa (saldo inicial + recebimentos em dinheiro).
+                    </p>
+                    
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-warning btn-lg">
+                        <button type="submit" class="btn btn-danger btn-lg mt-3" id="btn-fechar-caixa">
                             <i class="fas fa-lock"></i> Confirmar Fechamento
                         </button>
-                        
-                        <a href="{{ url_for('cupom_fechamento') }}" 
-                           target="_blank" 
-                           class="btn btn-info">
-                            <i class="fas fa-print"></i> Imprimir Relatório de Fechamento
-                        </a>
-
-                        <a href="{{ url_for('vendas') }}" class="btn btn-secondary">
-                            <i class="fas fa-times"></i> Cancelar
-                        </a>
                     </div>
                 </form>
             </div>
@@ -75,27 +89,39 @@
 </div>
 
 <script>
-// Calcula diferença em tempo real
-document.getElementById('saldo_final').addEventListener('input', function() {
-    const saldoFinal = parseFloat(this.value) || 0;
-    
-    // MODIFICADO: Agora usa as variáveis corretas
-    const saldoInicial = {{ caixa_aberto.saldo_inicial }};
-    const totalVendasDinheiro = {{ total_vendas_dinheiro }}; // Apenas vendas em dinheiro
-    
-    const saldoEsperado = saldoInicial + totalVendasDinheiro;
-    const diferenca = saldoFinal - saldoEsperado;
-    
-    const diferencaElement = document.getElementById('diferenca');
-    diferencaElement.textContent = 'R$ ' + diferenca.toFixed(2);
-    
-    if (diferenca > 0) {
-        diferencaElement.className = 'fw-bold text-success'; // Sobra
-    } else if (diferenca < 0) {
-        diferencaElement.className = 'fw-bold text-danger'; // Falta
-    } else {
-        diferencaElement.className = 'fw-bold text-primary'; // Correto
+document.addEventListener('DOMContentLoaded', function() {
+    const inputSaldoFinal = document.getElementById('saldo_final');
+    const resultadoDiv = document.getElementById('conferencia-resultado');
+    const saldoEsperado = parseFloat({{ saldo_esperado_dinheiro | tojson }});
+
+    function conferirCaixa() {
+        const saldoFinalStr = inputSaldoFinal.value.replace(',', '.');
+        const saldoFinal = parseFloat(saldoFinalStr);
+
+        // Se o campo estiver vazio ou não for um número
+        if (isNaN(saldoFinal)) {
+            resultadoDiv.style.display = 'none';
+            return;
+        }
+
+        const diferenca = parseFloat((saldoFinal - saldoEsperado).toFixed(2));
+
+        resultadoDiv.style.display = 'block';
+        
+        if (diferenca === 0.00) {
+            resultadoDiv.className = 'alert alert-success mt-3';
+            resultadoDiv.innerHTML = '<i class="fas fa-check-circle"></i> **CONFERIDO!** O saldo está exato.';
+        } else if (diferenca > 0) {
+            resultadoDiv.className = 'alert alert-warning mt-3';
+            resultadoDiv.innerHTML = `<i class="fas fa-arrow-up"></i> **SOBRA!** Sobra de dinheiro físico: <strong class="text-success">R$ ${diferenca.toFixed(2).replace('.', ',')}</strong>`;
+        } else {
+            // Diferença negativa
+            resultadoDiv.className = 'alert alert-danger mt-3';
+            resultadoDiv.innerHTML = `<i class="fas fa-arrow-down"></i> **FALTA!** Falta de dinheiro físico: <strong class="text-danger">R$ ${Math.abs(diferenca).toFixed(2).replace('.', ',')}</strong>`;
+        }
     }
+
+    inputSaldoFinal.addEventListener('input', conferirCaixa);
 });
 </script>
 {% endblock %}
