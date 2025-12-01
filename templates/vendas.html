@@ -210,8 +210,6 @@
                                     <option value="dinheiro">Dinheiro</option>
                                     <option value="cartao">Cartão</option>
                                     <option value="pix">PIX</option>
-                                    <option value="transferencia">Transferência</option>
-                                    <option value="cheque">Cheque</option>
                                 </select>
                             </div>
                             <div class="col-6">
@@ -549,7 +547,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 pagamentos = []; // Limpa também os pagamentos
                 renderizarCarrinho();
                 limparFormularioProduto();
-                renderizarPagamentos();
                 modalFinalizarVenda.hide();
             }
         }
@@ -786,9 +783,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Informações (Nome, Estoque)
             const infoHtml = `
-                <div class="info">
-                    <span class="nome">${produto.nome}</span>
-                    <span class="detalhes">Cód: ${produto.codigo_barras} | Estoque: ${produto.estoque_atual}</span>
+                <div class="d-flex align-items-center">
+                    <div class="info">
+                        <span class="nome">${produto.nome}</span>
+                        <span class="detalhes">Cód: ${produto.codigo_barras} | Estoque: ${produto.estoque_atual}</span>
+                    </div>
                 </div>
             `;
             
