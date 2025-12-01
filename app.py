@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 # CORREÇÃO: LoginManager deve ser importado
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from database import db
-from sqlalchemy import func, or_ 
+from sqlalchemy import func, or_, asc
 # Importação dos modelos atualizados (incluindo PagamentoVenda)
 from models import Usuario, Produto, Venda, ItemVenda, MovimentoCaixa, PagamentoVenda
 # Importações de data/hora atualizadas (agora usando APENAS HORA LOCAL)
@@ -443,9 +443,13 @@ def fechar_caixa():
     }
     
     for forma, total in vendas_agrupadas:
-        # Normaliza a chave, garantindo que outras formas sejam incluídas se existirem
         forma_str = str(forma).lower()
-        totais[forma_str] = float(total or 0.0)
+        
+        # Filtra apenas as formas permitidas no PDV
+        if forma_str in ['dinheiro', 'cartao', 'pix']:
+            totais[forma_str] = float(total or 0.0)
+        
+        # O total geral deve somar todas as formas, mesmo as descontinuadas
         totais['total_geral'] += float(total or 0.0)
 
     # O 'saldo_esperado' é o (Saldo Inicial + Vendas em Dinheiro)
@@ -488,7 +492,8 @@ def produtos():
         return redirect(url_for('vendas'))
     
     # AGORA BUSCA OS PRODUTOS PARA LISTAR
-    produtos_lista = Produto.query.order_by(Produto.nome).all()
+    # ALTERAÇÃO: Ordenar por nome em ordem crescente explicitamente
+    produtos_lista = Produto.query.order_by(Produto.nome.asc()).all()
     # Renderiza o novo template 'produtos.html' (que será uma lista)
     return render_template('produtos.html', produtos=produtos_lista)
 
@@ -913,20 +918,20 @@ def relatorios():
     nome_filtro = "Geral (Todos os Caixas)"
 
     # Query base para vendas finalizadas no período
-    base_query_vendas_finalizadas = Venda.query.filter(
+    base_query = Venda.query.filter(
         Venda.status == 'finalizada',
         Venda.data_venda.between(data_inicio, data_fim)
     )
 
     # Aplica filtro de caixa se um específico foi selecionado
     if caixa_selecionado > 0:
-        base_query_vendas_finalizadas = base_query_vendas_finalizadas.filter(Venda.usuario_id == caixa_selecionado)
+        base_query = base_query.filter(Venda.usuario_id == caixa_selecionado)
         usuario_filtro = db.session.get(Usuario, caixa_selecionado)
         if usuario_filtro:
             nome_filtro = f"Caixa: {usuario_filtro.nome}"
 
     # Query para total vendido e número de vendas
-    vendas_filtradas = base_query_vendas_finalizadas.all()
+    vendas_filtradas = base_query.all()
     total_vendido = sum(v.valor_total for v in vendas_filtradas)
     num_vendas = len(vendas_filtradas)
     ticket_medio = (total_vendido / num_vendas) if num_vendas > 0 else 0
@@ -1202,11 +1207,38 @@ def relatorio_cupons():
     # Executa a query para obter a lista de vendas (cupons)
     vendas_lista = base_query.order_by(Venda.data_venda.desc()).all()
     
+    # CORREÇÃO DE ERRO: Serialização explícita para evitar Undefined/Não-serializáveis no template.
+    vendas_lista_serializada = []
+    for venda in vendas_lista:
+        # Serializa os pagamentos aninhados
+        pagamentos_serializados = []
+        for p in venda.pagamentos:
+            pagamentos_serializados.append({
+                'forma': str(p.forma_pagamento),
+                'valor': float(p.valor or 0.0),
+                'data': p.data_pagamento.strftime('%Y-%m-%d %H:%M:%S') if p.data_pagamento else None
+            })
+
+        vendas_lista_serializada.append({
+            'id': venda.id,
+            'numero_venda': venda.numero_venda,
+            # Garante que data_venda seja string para serialização JSON
+            'data_venda': venda.data_venda.strftime('%Y-%m-%d %H:%M:%S'), 
+            'status': str(venda.status),
+            'operador': venda.operador.nome,
+            'valor_total': float(venda.valor_total),
+            'valor_pago': float(venda.valor_pago),
+            'troco': float(venda.troco),
+            'pagamentos': pagamentos_serializados,
+        })
+    # FIM CORREÇÃO DE ERRO
+    
     # Calcula o total geral dos cupons filtrados (usando a propriedade dinâmica valor_total)
     total_geral_cupons = sum(v.valor_total for v in vendas_lista)
 
     return render_template('relatorio_cupons.html',
                          vendas_lista=vendas_lista,
+                         vendas_lista_serializada=vendas_lista_serializada, # Variável serializada para JS
                          total_geral_cupons=total_geral_cupons,
                          data_inicio=data_inicio_str,
                          data_fim=data_fim_str,
@@ -1264,7 +1296,7 @@ def exportar_relatorio():
     for venda in vendas_lista_final:
         # Pega as informações de pagamento uma única vez para a venda
         pagamentos_info = {}
-        # Garante que as colunas Dinheiro, Cartão, PIX existam com valor 0.0
+        # CORREÇÃO: Apenas as formas principais permitidas no PDV
         formas_colunas = {
             'dinheiro': 0.0,
             'cartao': 0.0,
@@ -1279,6 +1311,7 @@ def exportar_relatorio():
             if forma_lower in formas_colunas:
                 formas_colunas[forma_lower] += valor
             else:
+                # Todas as outras (incluindo transferencia e cheque) vão para "Outras Formas"
                 outras_formas.append(f"{p.forma_pagamento.title()}: R$ {valor:.2f}")
 
         row = {
@@ -1291,7 +1324,7 @@ def exportar_relatorio():
             'Valor Pago Total (R$)': venda.valor_pago,
             'Troco Venda (R$)': venda.troco,
             
-            # Detalhamento de Pagamentos
+            # Detalhamento de Pagamentos (Apenas Dinheiro, Cartão e PIX como colunas principais)
             'Dinheiro (R$)': formas_colunas['dinheiro'],
             'Cartão (R$)': formas_colunas['cartao'],
             'PIX (R$)': formas_colunas['pix'],
@@ -1391,7 +1424,9 @@ def editar_pagamento(venda_id):
 
     nova_forma = request.form.get('nova_forma_pagamento')
     
-    if nova_forma in ['dinheiro', 'cartao', 'pix', 'transferencia', 'cheque']:
+    # ALTERAÇÃO: Removido 'transferencia' e 'cheque' das formas válidas
+    formas_permitidas = ['dinheiro', 'cartao', 'pix']
+    if nova_forma in formas_permitidas:
         
         pagamento_unico = venda.pagamentos[0]
         forma_antiga = pagamento_unico.forma_pagamento
@@ -1411,7 +1446,8 @@ def editar_pagamento(venda_id):
         # A mensagem de flash deve ser mais informativa sobre o que realmente foi alterado
         flash(f'Venda #{venda.numero_venda} (Pagamento Único) alterada de {forma_antiga.title()} (R$ {valor_antigo:.2f}) para {nova_forma.title()} (R$ {pagamento_unico.valor:.2f}).', 'success')
     else:
-        flash('Forma de pagamento inválida.', 'danger')
+        # Se a forma for uma das removidas (transferencia/cheque) ou inválida
+        flash('Forma de pagamento inválida ou não permitida para edição rápida (Apenas Dinheiro, Cartão, PIX).', 'danger')
 
     # Passa os argumentos de filtro de volta para a URL do relatorio
     return redirect(url_for('relatorios', 
@@ -1581,8 +1617,11 @@ def api_buscar_produto(codigo):
         
     # GERA A URL DA IMAGEM SE ELA EXISTIR
     imagem_path = None
-    if produto.imagem_url:
+    # CORREÇÃO: Verifica explicitamente se a imagem_url é uma string para evitar TypeError de objetos Undefined
+    if isinstance(produto.imagem_url, str) and produto.imagem_url:
         # Usa url_for para gerar o caminho correto
+        # .replace('static/', '', 1) é usado porque a URL salva no BD é 'static/uploads/produtos/...'
+        # mas url_for('static', filename=...) precisa apenas de 'uploads/produtos/...'
         imagem_path = url_for('static', filename=produto.imagem_url.replace('static/', '', 1))
         
     return jsonify({
@@ -1628,7 +1667,9 @@ def api_buscar_produtos_por_nome():
     resultados_json = []
     for produto in produtos_encontrados:
         imagem_path = None
-        if produto.imagem_url:
+        # CORREÇÃO: Verifica explicitamente se a imagem_url é uma string para evitar TypeError de objetos Undefined
+        if isinstance(produto.imagem_url, str) and produto.imagem_url:
+            # Usa url_for para gerar o caminho correto
             imagem_path = url_for('static', filename=produto.imagem_url.replace('static/', '', 1))
             
         resultados_json.append({
@@ -1674,6 +1715,7 @@ def finalizar_venda():
         
         valor_total_venda = 0
         itens_venda_db = []
+        formas_permitidas_pdv = ['dinheiro', 'cartao', 'pix']
         
         # 1. Loop nos itens do carrinho para validar estoque e calcular total
         for item_json in data['itens']:
@@ -1726,6 +1768,12 @@ def finalizar_venda():
 
         for pagamento_json in data['pagamentos']:
             forma = pagamento_json['forma_pagamento']
+            
+            # ALTERAÇÃO: Garante que a forma de pagamento enviada pelo PDV seja permitida
+            if forma not in formas_permitidas_pdv:
+                 # Isso só deve acontecer se o frontend foi modificado para enviar uma opção descontinuada.
+                 raise Exception(f"Forma de pagamento '{forma}' não é permitida no PDV.")
+            
             valor = float(pagamento_json['valor'])
             valor_pago_total += valor
             
