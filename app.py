@@ -576,7 +576,7 @@ def produtos_editar(id):
         produto.nome = request.form.get('nome')
         produto.descricao = request.form.get('descricao')
         produto.preco_venda = float(request.form.get('preco_venda', 0))
-        produto.preco_custo = float(request.form.get('preco_custo', 0))
+        produto.preco_custo = float(request.form.get('preco_custo', 0)),
         produto.categoria = request.form.get('categoria')
         produto.estoque_atual = int(request.form.get('estoque_atual', 0))
         produto.estoque_minimo = int(request.form.get('estoque_minimo', 0))
@@ -1017,7 +1017,7 @@ def relatorios():
                          pagamentos_agrupados=pagamentos_agrupados, # Pagamentos agrupados
                          caixas=caixas, # Envia a lista de caixas para o filtro
                          caixa_selecionado=caixa_selecionado, # Envia o ID do caixa selecionado
-                         nome_filtro=nome_filtro, # Envia o nome do filtro
+                         nome_filtro=nome_filtro,
                          forma_pgto_selecionada=forma_pgto_selecionada
                          )
 # =============================================================================

@@ -38,12 +38,10 @@
                 <option value="pix" {% if forma_pgto_selecionada == 'pix' %}selected{% endif %}>PIX</option>
             </select>
         </div>
-        <!-- NOVO CAMPO DE BUSCA -->
         <div class="col-md-3">
             <label for="numero_venda_busca" class="form-label">Buscar Cupom Nº:</label>
             <input type="text" class="form-control" id="numero_venda_busca" name="numero_venda_busca" value="{{ numero_venda_busca }}" placeholder="Ex: 1001">
         </div>
-        <!-- FIM NOVO CAMPO DE BUSCA -->
         <div class="col-md-9 d-flex justify-content-end gap-2">
             <button type="submit" class="btn btn-primary">
                 <i class="fas fa-filter"></i> Aplicar Filtro
@@ -110,14 +108,14 @@
                 </td>
                 <td class="text-center text-nowrap">
                     {% if venda.status != 'cancelada' %}
-                        <!-- Botão de Editar Pagamento (Abre Modal) -->
                         {% if venda.pagamentos | length == 1 %}
                             <button type="button" class="btn btn-sm btn-info text-white me-1" 
                                     data-bs-toggle="modal" 
                                     data-bs-target="#modalEditarPagamento"
                                     data-venda-id="{{ venda.id }}"
                                     data-forma-atual="{{ venda.pagamentos[0].forma_pagamento }}"
-                                    data-valor-venda="{{ '%.2f'|format(venda.valor_total) }}">
+                                    data-valor-venda="{{ '%.2f'|format(venda.valor_total) }}"
+                                    data-venda-numero="{{ venda.numero_venda }}">
                                 <i class="fas fa-edit"></i> Pgto
                             </button>
                         {% else %}
@@ -126,9 +124,7 @@
                             </span>
                         {% endif %}
 
-                        <!-- Formulário de Cancelamento (Estorno) -->
                         <form action="{{ url_for('vendas_cancelar', venda_id=venda.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja CANCELAR a Venda #{{ venda.numero_venda }}? Isso irá reverter o estoque e não pode ser desfeito!');" class="d-inline">
-                            <!-- Campo hidden para redirecionar para a URL atual após a ação -->
                             <input type="hidden" name="next_url" value="{{ request.full_path }}">
                             <button type="submit" class="btn btn-sm btn-danger" title="Cancelar Venda e Reverter Estoque">
                                 <i class="fas fa-undo"></i> Cancelar
@@ -149,7 +145,6 @@
 {% endif %}
 
 
-<!-- Modal para Edição da Forma de Pagamento -->
 <div class="modal fade" id="modalEditarPagamento" tabindex="-1" aria-labelledby="modalEditarPagamentoLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -159,7 +154,7 @@
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="POST" id="form-editar-pagamento">
+            <form method="POST" id="form-editar-pagamento" action="{{ url_for('editar_pagamento', venda_id=0) }}">
                 <div class="modal-body">
                     <p class="text-danger fw-bold">Atenção: Esta ação deve ser utilizada apenas para corrigir erros de lançamento. Apenas a forma de pagamento é alterada. Se o valor estiver errado, cancele e refaça a venda.</p>
                     
@@ -182,8 +177,6 @@
                             <option value="dinheiro">Dinheiro</option>
                             <option value="cartao">Cartão</option>
                             <option value="pix">PIX</option>
-                            <option value="transferencia">Transferência</option>
-                            <option value="cheque">Cheque</option>
                         </select>
                     </div>
                 </div>
@@ -199,49 +192,46 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Objeto global que armazena a lista serializada (corrigida no Python)
-        // CORREÇÃO: Usamos o filtro | tojson sem aspas externas e garantimos o safe.
-        // Se a variável for Undefined (erro no Python), o template irá injetar '[]' como fallback.
-        // O `default('[]')` deve resolver o erro "Undefined" no lado Python antes da serialização.
-        const vendasListaSerializada = {{ vendas_lista_serializada | tojson | default('[]') }};
         
         const modalEditarPagamento = document.getElementById('modalEditarPagamento');
         const formEditarPagamento = document.getElementById('form-editar-pagamento');
         
-        // Função para obter os dados da venda serializada pelo ID
-        function getVendaData(vendaId) {
-            // Usa a lista serializada, que agora é um array JSON válido
-            return vendasListaSerializada.find(v => v.id === vendaId);
-        }
+        // Captura a URL base com o placeholder '0' que o Jinja renderizou (ex: '/vendas/editar_pagamento/0')
+        const baseUrlWithPlaceholder = formEditarPagamento.action; 
 
         modalEditarPagamento.addEventListener('show.bs.modal', function (event) {
-            // Botão que disparou o modal
             const button = event.relatedTarget; 
             
-            // Extrai as informações dos atributos data-*
-            const vendaId = parseInt(button.getAttribute('data-venda-id'));
+            // Extrai as informações dos atributos data-* do botão
+            const vendaId = button.getAttribute('data-venda-id');
+            const formaAtual = button.getAttribute('data-forma-atual');
+            const valorTotalVenda = button.getAttribute('data-valor-venda');
+            const vendaNumero = button.getAttribute('data-venda-numero');
             
-            // Busca o objeto Venda serializado
-            const vendaData = getVendaData(vendaId);
+            // 1. Define o action do formulário dinamicamente, substituindo o placeholder '0' pelo ID da venda
+            // Se o ID for inválido (nulo ou '0'), a submissão será barrada no servidor,
+            // mas o log indicou que o problema é a submissão com ID 0.
+            const newAction = baseUrlWithPlaceholder.replace('/0', '/' + vendaId);
+            formEditarPagamento.action = newAction;
 
-            if (!vendaData || !vendaData.primeiro_pagamento) {
-                // Caso extremo: o botão só deve ser ativado se for length == 1.
-                console.error("Dados da venda não encontrados para o ID:", vendaId);
-                return;
-            }
-
-            // Atualiza o título do modal e o campo hidden do formulário
-            document.getElementById('modal-venda-numero').textContent = vendaData.numero_venda;
+            // 2. Preenche campos de informação estática no modal
+            document.getElementById('modal-venda-numero').textContent = vendaNumero;
+            // Mostra a forma atual com a primeira letra maiúscula
+            document.getElementById('forma-atual').textContent = formaAtual.charAt(0).toUpperCase() + formaAtual.slice(1); 
+            // Substitui o ponto por vírgula para formatação visual (se o valor do data-atributo for string)
+            document.getElementById('valor-total-venda').textContent = `R$ ${valorTotalVenda.replace('.', ',')}`;
             
-            // Define o action do formulário para a rota correta
-            formEditarPagamento.action = `{{ url_for('editar_pagamento', venda_id=0) }}`.replace('0', vendaId);
-            
-            // Preenche campos de informação estática
-            document.getElementById('forma-atual').textContent = vendaData.primeiro_pagamento.forma_pagamento.charAt(0).toUpperCase() + vendaData.primeiro_pagamento.forma_pagamento.slice(1);
-            document.getElementById('valor-total-venda').textContent = `R$ ${vendaData.valor_total.toFixed(2).replace('.', ',')}`;
-            
-            // Define a nova forma de pagamento para a forma atual (pode ser alterada pelo usuário)
-            document.getElementById('nova_forma_pagamento').value = vendaData.primeiro_pagamento.forma_pagamento;
+            // 3. Define a nova forma de pagamento para a forma atual como padrão no dropdown
+            document.getElementById('nova_forma_pagamento').value = formaAtual; 
+        });
+        
+        // Adiciona um listener para a submissão do formulário para garantir que o ID não é zero no cliente
+        formEditarPagamento.addEventListener('submit', function(e) {
+             // Se o action ainda for a URL com '/0', impede a submissão e alerta o usuário
+             if (formEditarPagamento.action.endsWith('/0')) {
+                 e.preventDefault();
+                 alert('Erro: Não foi possível carregar o ID da venda. Tente novamente ou recarregue a página.');
+             }
         });
     });
 </script>
