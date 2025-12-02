@@ -57,16 +57,6 @@
         filter: drop-shadow(2px 2px 3px rgba(13, 13, 14, 1)); /* Sombra suave */
     }
     /* ======================================================= */
-
-    /* ======================================================= */
-    /* AJUSTE: Classe de credenciais removida pois o texto 
-       agora está dentro do card. */
-    /* ======================================================= */
-    /* .credenciais-teste {
-        color: white;
-        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
-    } 
-    */
     
     /* CSS PARA DIMINUIR OS INPUTS (MANTIDO) */
     .form-control-sm-custom {
@@ -100,6 +90,17 @@
                     <small>Faça login para continuar</small>
                 </div>
                 <div class="card-body p-4">
+                    
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert" style="font-size: 0.9rem;">
+                                    {{ message }}
+                                    <button type="button" class="btn-close pt-2" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
                     <form method="POST" action="{{ url_for('login') }}">
                         <div class="mb-3">
                             <label for="email" class="form-label">Email:</label>
