@@ -76,6 +76,41 @@ def load_user(user_id):
     return db.session.get(Usuario, int(user_id))
 
 # =============================================================================
+# FUNÇÕES AUXILIARES PARA TRATAMENTO DE VALORES NUMÉRICOS DE FORMULÁRIO
+# Corrigem o TypeError: float() argument must be a string or a real number, not 'tuple'
+# =============================================================================
+def _get_float_val(key, default=0.0):
+    """Tenta obter um valor float de um campo do formulário, tratando campos vazios ou multi-valores."""
+    # Usamos getlist para garantir que pegamos o valor mesmo se for inesperadamente 
+    # submetido como multi-valor.
+    value_list = request.form.getlist(key)
+    # Se a lista não estiver vazia, pegamos o primeiro elemento. Senão, usamos o default.
+    value = value_list[0] if value_list and value_list[0] else default
+    
+    try:
+        # Tenta converter para float
+        return float(value)
+    except (ValueError, TypeError):
+        # Em caso de falha na conversão, retorna o default (geralmente 0.0)
+        return default
+
+def _get_int_val(key, default=0):
+    """Tenta obter um valor int de um campo do formulário, tratando campos vazios ou multi-valores."""
+    value_list = request.form.getlist(key)
+    # Se a lista não estiver vazia, pegamos o primeiro elemento. Senão, usamos o default.
+    value = value_list[0] if value_list and value_list[0] else default
+    
+    try:
+        # Tenta converter para int. 
+        # Nota: Se o input for '1.5', int('1.5') falha. Se for esse o caso, precisaria de int(float(value)).
+        # Por segurança, mantemos a conversão direta e usamos o default em caso de erro, 
+        # já que os campos de estoque esperam inteiros.
+        return int(value)
+    except (ValueError, TypeError):
+        # Em caso de falha na conversão, retorna o default (geralmente 0)
+        return default
+
+# =============================================================================
 # FUNÇÃO AUXILIAR PARA VERIFICAR CAIXA ABERTO
 # =============================================================================
 
@@ -342,7 +377,8 @@ def abrir_caixa():
         return redirect(url_for('vendas'))
     
     if request.method == 'POST':
-        saldo_inicial = float(request.form.get('saldo_inicial', 0))
+        # CORREÇÃO: Usando a função auxiliar para garantir que o valor seja um float/string único
+        saldo_inicial = _get_float_val('saldo_inicial')
         
         # Cria novo movimento de caixa (models.py usará datetime.now() por padrão)
         novo_caixa = MovimentoCaixa(
@@ -381,7 +417,8 @@ def fechar_caixa():
     
     # --- LÓGICA DO MÉTODO POST (Onde o fechamento ocorre) ---
     if request.method == 'POST':
-        saldo_final = float(request.form.get('saldo_final', 0))
+        # CORREÇÃO: Usando a função auxiliar para garantir que o valor seja um float/string único
+        saldo_final = _get_float_val('saldo_final')
         
         # 1. Define o momento exato do fechamento UMA VEZ (em HORA LOCAL)
         momento_fechamento = datetime.now() 
@@ -492,8 +529,8 @@ def produtos():
         return redirect(url_for('vendas'))
     
     # AGORA BUSCA OS PRODUTOS PARA LISTAR
-    # ALTERAÇÃO: Ordenar por nome em ordem crescente explicitamente
-    produtos_lista = Produto.query.order_by(Produto.nome.asc()).all()
+    # CORREÇÃO: Adicionando Produto.id.asc() como ordenação secundária para garantir estabilidade
+    produtos_lista = Produto.query.order_by(Produto.nome.asc(), Produto.id.asc()).all()
     # Renderiza o novo template 'produtos.html' (que será uma lista)
     return render_template('produtos.html', produtos=produtos_lista)
 
@@ -516,15 +553,16 @@ def produtos_novo():
             # Retorna o formulário com os dados preenchidos
             return render_template('produto_form.html', produto=request.form)
 
+        # CORREÇÃO: Usando as funções auxiliares para extrair e converter valores numéricos com segurança
         novo_produto = Produto(
             codigo_barras=codigo_barras,
             nome=nome,
             descricao=request.form.get('descricao'),
-            preco_venda=float(request.form.get('preco_venda', 0)),
-            preco_custo=float(request.form.get('preco_custo', 0)),
+            preco_venda=_get_float_val('preco_venda'),
+            preco_custo=_get_float_val('preco_custo'),
             categoria=request.form.get('categoria'),
-            estoque_atual=int(request.form.get('estoque_atual', 0)),
-            estoque_minimo=int(request.form.get('estoque_minimo', 0)),
+            estoque_atual=_get_int_val('estoque_atual'),
+            estoque_minimo=_get_int_val('estoque_minimo'),
             ativo=True
             # O model usará datetime.now() para data_criacao
         )
@@ -575,11 +613,12 @@ def produtos_editar(id):
         produto.codigo_barras = codigo_barras_novo
         produto.nome = request.form.get('nome')
         produto.descricao = request.form.get('descricao')
-        produto.preco_venda = float(request.form.get('preco_venda', 0))
-        produto.preco_custo = float(request.form.get('preco_custo', 0)),
+        # CORREÇÃO: Usando as funções auxiliares para extrair e converter valores numéricos com segurança
+        produto.preco_venda = _get_float_val('preco_venda')
+        produto.preco_custo = _get_float_val('preco_custo')
         produto.categoria = request.form.get('categoria')
-        produto.estoque_atual = int(request.form.get('estoque_atual', 0))
-        produto.estoque_minimo = int(request.form.get('estoque_minimo', 0))
+        produto.estoque_atual = _get_int_val('estoque_atual')
+        produto.estoque_minimo = _get_int_val('estoque_minimo')
         # O model usará datetime.now() para data_atualizacao (onupdate)
 
         # --- Lógica de Upload da Imagem ---
@@ -1017,7 +1056,7 @@ def relatorios():
                          pagamentos_agrupados=pagamentos_agrupados, # Pagamentos agrupados
                          caixas=caixas, # Envia a lista de caixas para o filtro
                          caixa_selecionado=caixa_selecionado, # Envia o ID do caixa selecionado
-                         nome_filtro=nome_filtro,
+                         nome_filtro=nome_filtro, # Envia o nome do filtro
                          forma_pgto_selecionada=forma_pgto_selecionada
                          )
 # =============================================================================
@@ -1269,7 +1308,11 @@ def exportar_relatorio():
     data_inicio_str, data_fim_str, data_inicio, data_fim = get_filtro_datas(request)
     
     caixa_id_str = request.args.get('caixa_id', '0')
-    caixa_selecionado = int(caixa_id_str)
+    caixa_selecionado = 0
+    try:
+        caixa_selecionado = int(caixa_id_str)
+    except ValueError:
+        caixa_selecionado = 0 
     forma_pgto_selecionada = request.args.get('forma_pgto', 'todos')
     # --- FIM DA LÓGICA DE FILTRO ---
 
@@ -1661,7 +1704,8 @@ def api_buscar_produtos_por_nome():
             Produto.codigo_barras.ilike(filtro_like)
         ),
         Produto.ativo == True
-    ).order_by(Produto.nome).limit(20).all() # Limita a 20 resultados
+    # CORREÇÃO: Adicionando Produto.id.asc() como ordenação secundária para garantir estabilidade
+    ).order_by(Produto.nome.asc(), Produto.id.asc()).limit(20).all() # Limita a 20 resultados
 
     # Formata os resultados
     resultados_json = []
