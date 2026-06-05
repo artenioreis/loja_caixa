@@ -5,82 +5,349 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sistema de Caixa{% endblock %}</title>
     
-    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/all.min.css') }}">
+    <!-- Fonte Premium -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        .sidebar {
-            min-height: 100vh;
-            background-color: #343a40;
-        }
-        .sidebar .nav-link {
-            color: #fff;
-        }
-        .sidebar .nav-link:hover {
-            background-color: #495057;
-        }
-        .content {
-            padding: 20px;
-        }
-        .stats-card {
-            border-radius: 10px;
-            transition: transform 0.2s;
-        }
-        .stats-card:hover {
-            transform: translateY(-5px);
+        /* ================================================= */
+        /* ESTILOS GLOBAIS E FUNDO                           */
+        /* ================================================= */
+        :root {
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-color: #3b82f6;
+            --accent-hover: #60a5fa;
+            --danger-color: #ef4444;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
         }
 
-        /* CSS PARA OCULTAR MENU */
-        #sidebar-toggle-btn {
+        body {
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+            background: url('https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-color: #0f172a;
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Overlay do body quando autenticado */
+        .body-overlay {
             position: fixed;
-            top: 10px;
-            left: 10px;
-            z-index: 1031;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.75) 100%);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: -1;
+        }
+
+        /* ================================================= */
+        /* CLASSES UTILITÁRIAS (GLASSMORPHISM)               */
+        /* ================================================= */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: var(--glass-shadow);
+            color: var(--text-primary);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .glass-card-header {
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+        }
+        
+        .glass-card-body {
+            padding: 1.5rem;
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.2) !important;
+            border: 1px solid var(--glass-border) !important;
+            color: var(--text-primary) !important;
+            border-radius: 10px;
+            padding: 0.6rem 1rem;
             transition: all 0.3s ease;
         }
-        .sidebar-hidden {
-            display: none !important;
+        .glass-input:focus {
+            background: rgba(0, 0, 0, 0.4) !important;
+            border-color: var(--accent-color) !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
         }
-        .content-fullwidth {
-            margin-left: 0 !important;
-            max-width: 100% !important;
-            width: 100% !important;
+        .glass-input::placeholder {
+            color: var(--text-secondary) !important;
         }
 
-        /* SIDEBAR LOGO */
-        .sidebar-logo-container {
+        .btn-glass {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            color: var(--text-primary);
+            backdrop-filter: blur(4px);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        .btn-glass:hover {
+            background: rgba(59, 130, 246, 0.4);
+            transform: translateY(-2px);
+            color: white;
+        }
+        
+        .btn-glass-primary {
+            background: linear-gradient(135deg, var(--accent-color) 0%, #1d4ed8 100%);
+            border: none;
+            color: white;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+        }
+        .btn-glass-primary:hover {
+            background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent-color) 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+            color: white;
+        }
+
+        .btn-glass-success {
+            background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+            border: none;
+            color: white;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        .btn-glass-success:hover {
+            background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+            transform: translateY(-2px);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        /* Glass Table */
+        .glass-table-wrapper {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            overflow: hidden;
+        }
+        .glass-table {
+            width: 100%;
+            margin-bottom: 0;
+            color: var(--text-primary);
+        }
+        .glass-table th {
+            background: rgba(0,0,0,0.3);
+            border-bottom: 2px solid var(--glass-border);
             padding: 1rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+        .glass-table td {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            vertical-align: middle;
+        }
+        .glass-table tbody tr {
+            transition: background 0.2s ease;
+        }
+        .glass-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* ================================================= */
+        /* SIDEBAR / MENU LATERAL                            */
+        /* ================================================= */
+        .sidebar {
+            min-height: 100vh;
+            background: rgba(15, 23, 42, 0.65) !important; /* Sobrescreve bg-dark */
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid var(--glass-border);
+            box-shadow: 4px 0 24px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        .sidebar .nav-link {
+            color: var(--text-secondary);
+            border-radius: 8px;
+            margin: 0.2rem 1rem;
+            padding: 0.8rem 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+        }
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            width: 20px;
             text-align: center;
-            border-bottom: 1px solid #495057;
+            font-size: 1.1rem;
+            transition: transform 0.3s ease;
+        }
+        .sidebar .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            transform: translateX(5px);
+        }
+        .sidebar .nav-link:hover i {
+            transform: scale(1.2);
+            color: var(--accent-color);
+        }
+        
+        .sidebar-logo-container {
+            padding: 1.5rem 1rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
         .sidebar-logo {
-            max-height: 60px;
+            max-height: 55px;
             width: auto;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4));
+            transition: transform 0.3s ease;
         }
+        .sidebar-logo:hover {
+            transform: scale(1.05);
+        }
+
+        /* ================================================= */
+        /* CONTEÚDO PRINCIPAL                                */
+        /* ================================================= */
+        .content {
+            padding: 30px;
+        }
+
+        /* ================================================= */
+        /* BOTÃO TOGGLE (MOBILE & DESKTOP OCULTAR)           */
+        /* ================================================= */
+        #sidebar-toggle-btn {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1050;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: white;
+            padding: 8px 12px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        #sidebar-toggle-btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.05);
+        }
+
+        /* ================================================= */
+        /* RESPONSIVIDADE E LÓGICA DO MENU                   */
+        /* ================================================= */
+        @media (min-width: 768px) {
+            .sidebar-hidden {
+                display: none !important;
+            }
+            .content-fullwidth {
+                margin-left: 0 !important;
+                max-width: 100% !important;
+                width: 100% !important;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            #sidebar {
+                position: fixed;
+                top: 0;
+                left: -280px;
+                width: 280px;
+                height: 100vh;
+                z-index: 1040;
+                transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                overflow-y: auto;
+                display: block !important;
+            }
+            #sidebar.show-mobile {
+                left: 0;
+                box-shadow: 10px 0 50px rgba(0,0,0,0.5);
+            }
+            body {
+                padding-top: 60px;
+            }
+            .content {
+                padding: 15px;
+            }
+        }
+
+        /* Custom alert styling */
+        .alert-glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .alert-glass.alert-danger {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #fecaca;
+        }
+        .alert-glass.alert-success {
+            background: rgba(16, 185, 129, 0.25);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #a7f3d0;
+        }
+        .alert-glass.alert-warning {
+            background: rgba(245, 158, 11, 0.25);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #fde68a;
+        }
+        .alert-glass .btn-close {
+            filter: brightness(0) invert(1);
+            opacity: 0.8;
+        }
+
     </style>
     
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     {% if current_user.is_authenticated %}
+    
+    <!-- Fundo Escuro Glassmorphism apenas para área logada -->
+    <div class="body-overlay"></div>
 
-    <button id="sidebar-toggle-btn" class="btn btn-secondary btn-sm">
+    <button id="sidebar-toggle-btn" class="btn">
         <i id="sidebar-toggle-icon" class="fas fa-bars"></i>
     </button>
 
-    <div class="container-fluid">
-        <div class="row">
-            <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse bg-dark">
-                <div class="position-sticky pt-3">
+    <div class="container-fluid p-0">
+        <div class="row g-0">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="col-md-3 col-lg-2 sidebar">
+                <div class="position-sticky pt-3 h-100 d-flex flex-column">
                     
                     <div class="sidebar-logo-container">
                         <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="sidebar-logo">
                     </div>
-                    <h5 class="text-white text-center mb-4 mt-3"> <i class="fas fa-cash-register"></i> Sistema Caixa
+                    <h5 class="text-white text-center mb-4 mt-3" style="font-weight: 600; letter-spacing: 0.5px;"> 
+                        <i class="fas fa-cash-register text-primary me-2"></i> PDV System
                     </h5>
                     
-                    <ul class="nav flex-column">
+                    <ul class="nav flex-column mb-auto">
                         
                         {% if current_user.is_admin() %}
                         <li class="nav-item">
@@ -104,47 +371,56 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                        <a class="nav-link {% if 'relatorio_cupons' in request.path %}active{% endif %}" href="{{ url_for('relatorio_cupons') }}">
-                            <i class="fas fa-file-invoice-dollar"></i> Relatório (Cupons)
-                        </a>
-                    </li>
+                            <a class="nav-link" href="{{ url_for('extrato_estoque') }}">
+                                <i class="fas fa-list-alt"></i> Extrato de Estoque
+                            </a>
+                        </li>
                         {% endif %}
                         
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('vendas') }}">
-                                <i class="fas fa-shopping-cart"></i> PDV - Vendas
+                        <li class="nav-item mt-3">
+                            <a class="nav-link" href="{{ url_for('vendas') }}" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: white;">
+                                <i class="fas fa-shopping-cart text-primary"></i> <b>Frente de Caixa</b>
                             </a>
                         </li>
                         
-                        <li class="nav-item">
+                        <li class="nav-item mt-2">
                             {% if caixa_aberto %}
-                            <a class="nav-link text-warning" href="{{ url_for('fechar_caixa') }}">
+                            <a class="nav-link" href="{{ url_for('fechar_caixa') }}" style="color: #fca5a5;">
                                 <i class="fas fa-lock"></i> Fechar Caixa
                             </a>
                             {% else %}
-                            <a class="nav-link text-success" href="{{ url_for('abrir_caixa') }}">
+                            <a class="nav-link" href="{{ url_for('abrir_caixa') }}" style="color: #86efac;">
                                 <i class="fas fa-lock-open"></i> Abrir Caixa
                             </a>
                             {% endif %}
                         </li>
                     </ul>
                     
-                    <div class="mt-4 p-2">
-                        <small class="text-muted">Logado como: {{ current_user.nome }}</small>
-                        <br>
-                        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light mt-2 w-100">
-                            <i class="fas fa-sign-out-alt"></i> Sair
+                    <div class="mt-4 p-3 border-top border-secondary border-opacity-25" style="background: rgba(0,0,0,0.1);">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="rounded-circle bg-primary d-flex justify-content-center align-items-center me-3" style="width: 40px; height: 40px; color: white;">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div>
+                                <small class="text-secondary d-block" style="font-size: 0.75rem;">Operador Logado</small>
+                                <span class="text-white fw-bold">{{ current_user.nome }}</span>
+                            </div>
+                        </div>
+                        <a href="{{ url_for('logout') }}" class="btn btn-glass w-100 text-center">
+                            <i class="fas fa-sign-out-alt me-2"></i> Sair do Sistema
                         </a>
                     </div>
                 </div>
             </nav>
 
-            <main id="main-content" class="col-md-9 ms-sm-auto col-lg-10 px-md-4 content">
+            <!-- Main Content -->
+            <main id="main-content" class="col-md-9 ms-sm-auto col-lg-10 content">
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         {% for category, message in messages %}
-                            <div class="alert alert-{{ category }} alert-dismissible fade show mt-3" role="alert">
-                                {{ message }}
+                            <div class="alert alert-glass alert-{{ category }} alert-dismissible fade show d-flex align-items-center" role="alert">
+                                <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'danger' %}fa-exclamation-triangle{% else %}fa-info-circle{% endif %} me-3 fs-5"></i>
+                                <div>{{ message }}</div>
                                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                             </div>
                         {% endfor %}
@@ -159,7 +435,7 @@
         {% block content_public %}{% endblock %}
     {% endif %}
 
-    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -170,26 +446,46 @@
 
         if (toggleBtn && sidebar && mainContent) {
             function setMenuState(hidden) {
-                if (hidden) {
-                    sidebar.classList.add('sidebar-hidden');
-                    mainContent.classList.add('content-fullwidth');
-                    toggleIcon.classList.remove('fa-bars');
-                    toggleIcon.classList.add('fa-times');
-                    localStorage.setItem('sidebarHidden', 'true');
+                if (window.innerWidth < 768) {
+                    if (hidden) {
+                        sidebar.classList.remove('show-mobile');
+                        toggleIcon.classList.remove('fa-times');
+                        toggleIcon.classList.add('fa-bars');
+                    } else {
+                        sidebar.classList.add('show-mobile');
+                        toggleIcon.classList.remove('fa-bars');
+                        toggleIcon.classList.add('fa-times');
+                    }
                 } else {
-                    sidebar.classList.remove('sidebar-hidden');
-                    mainContent.classList.remove('content-fullwidth');
-                    toggleIcon.classList.remove('fa-times');
-                    toggleIcon.classList.add('fa-bars');
-                    localStorage.setItem('sidebarHidden', 'false');
+                    if (hidden) {
+                        sidebar.classList.add('sidebar-hidden');
+                        mainContent.classList.add('content-fullwidth');
+                        toggleIcon.classList.remove('fa-bars');
+                        toggleIcon.classList.add('fa-times');
+                        localStorage.setItem('sidebarHidden', 'true');
+                    } else {
+                        sidebar.classList.remove('sidebar-hidden');
+                        mainContent.classList.remove('content-fullwidth');
+                        toggleIcon.classList.remove('fa-times');
+                        toggleIcon.classList.add('fa-bars');
+                        localStorage.setItem('sidebarHidden', 'false');
+                    }
                 }
             }
 
-            const isHidden = localStorage.getItem('sidebarHidden') === 'true';
-            setMenuState(isHidden);
+            let initialState = true;
+            if (window.innerWidth >= 768) {
+                initialState = localStorage.getItem('sidebarHidden') === 'true';
+            }
+            setMenuState(initialState);
 
             toggleBtn.addEventListener('click', function() {
-                const currentStateHidden = sidebar.classList.contains('sidebar-hidden');
+                let currentStateHidden;
+                if (window.innerWidth < 768) {
+                    currentStateHidden = !sidebar.classList.contains('show-mobile');
+                } else {
+                    currentStateHidden = sidebar.classList.contains('sidebar-hidden');
+                }
                 setMenuState(!currentStateHidden);
             });
         }

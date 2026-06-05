@@ -11,7 +11,7 @@
 
     @media print {
         /* Esconde tudo que não é para imprimir */
-        #sidebar, #sidebar-toggle-btn, .border-bottom, .no-print {
+        #sidebar, #sidebar-toggle-btn, .border-bottom, .no-print, .body-overlay {
             display: none !important;
         }
 
@@ -20,6 +20,12 @@
             width: 100% !important;
             margin-left: 0 !important;
             padding: 0 !important;
+            background-color: #fff !important;
+        }
+        
+        body {
+            background: #fff !important;
+            color: #000 !important;
         }
 
         /* Mostra o título de impressão */
@@ -31,48 +37,37 @@
         }
         
         /* Estilos da tabela (inspirado em relatorios.html) */
-        body {
-            font-size: 10pt;
-            color: #000;
-            background-color: #fff;
-        }
-        .card {
+        .glass-card {
             border: none !important;
             box-shadow: none !important;
+            background: #fff !important;
         }
-        .table {
+        .glass-table {
             color: #000 !important;
             font-size: 10pt; /* Fonte maior para lista de preço */
             width: 100%;
             border-collapse: collapse;
         }
-        .table th, .table td {
+        .glass-table th, .glass-table td {
             padding: 5px 8px;
-            border: 1px solid #ccc;
+            border: 1px solid #ccc !important;
         }
         
-        /* ======================================================= */
-        /* INÍCIO DA ALTERAÇÃO (Cabeçalho)           */
-        /* ======================================================= */
-        
         /* Garante que o cabeçalho da tabela repita em novas páginas */
-        .table thead {
+        .glass-table thead {
             display: table-header-group;
             background-color: #ffffff !important; /* Força fundo branco */
             color: #000000 !important; /* Força texto preto */
-            border-bottom: 2px solid #000;
+            border-bottom: 2px solid #000 !important;
             -webkit-print-color-adjust: exact; 
             print-color-adjust: exact;
         }
 
         /* Garante que os TH (cabeçalhos) também fiquem pretos */
-        .table thead th {
+        .glass-table thead th {
             color: #000000 !important;
             background-color: #ffffff !important;
         }
-        /* ======================================================= */
-        /* FIM DA ALTERAÇÃO                       */
-        /* ======================================================= */
         
         /* Remove o badge de "Baixo" e "Ativo" */
         .badge {
@@ -84,79 +79,84 @@
 
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom no-print">
-    <h1 class="h2"><i class="fas fa-boxes"></i> Gerenciar Produtos</h1>
-    <div class="btn-toolbar mb-2 mb-md-0 no-print">
-        <button class="btn btn-secondary me-2" onclick="window.print()">
-            <i class="fas fa-print"></i> Imprimir Lista
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom border-secondary border-opacity-25 no-print">
+    <h1 class="h2 text-white fw-bold"><i class="fas fa-boxes text-info me-2"></i> Gerenciar Produtos</h1>
+    <div class="btn-toolbar mb-2 mb-md-0 d-flex flex-wrap gap-2 no-print">
+        <button class="btn btn-glass" onclick="window.print()">
+            <i class="fas fa-print me-1"></i> Imprimir Lista
         </button>
-        <a href="{{ url_for('produtos_importar') }}" class="btn btn-info me-2">
-            <i class="fas fa-file-excel"></i> Importar Excel
+        <a href="{{ url_for('produtos_importar') }}" class="btn btn-glass" style="color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4);">
+            <i class="fas fa-file-excel me-1"></i> Importar Excel
         </a>
-        <a href="{{ url_for('produtos_novo') }}" class="btn btn-success">
-            <i class="fas fa-plus"></i> Novo Produto
+        <a href="{{ url_for('produtos_novo') }}" class="btn btn-glass-success">
+            <i class="fas fa-plus me-1"></i> Novo Produto
         </a>
     </div>
 </div>
 
 <h2 class="print-only">Lista de Produtos e Preços</h2>
 
-<div class="card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
+<div class="glass-card">
+    <div class="glass-card-body p-0">
+        <div class="table-responsive glass-table-wrapper border-0 rounded-0">
+            <table class="glass-table align-middle">
+                <thead>
                     <tr>
-                        <th scope="col">ID</th>
+                        <th scope="col" style="width: 5%;">ID</th>
                         <th scope="col" class="no-print">Cód. Barras</th>
-                        <th scope="col">Nome</th>
+                        <th scope="col">Nome do Produto</th>
                         <th scope="col">Preço (R$)</th>
-                        <th scope="col" class="no-print">Estoque</th>
-                        <th scope="col" class="no-print">Status</th>
-                        <th scope="col" class="no-print">Ações</th>
+                        <th scope="col" class="no-print text-center">Estoque</th>
+                        <th scope="col" class="no-print text-center">Status</th>
+                        <th scope="col" class="no-print text-center">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for produto in produtos %}
                     <tr>
-                        <td>{{ produto.id }}</td>
-                        <td class="no-print">{{ produto.codigo_barras }}</td>
-                        <td>{{ produto.nome }}</td>
-                        <td>{{ "%.2f"|format(produto.preco_venda) }}</td>
-                        <td class="no-print">
+                        <td class="text-secondary fw-bold">{{ produto.id }}</td>
+                        <td class="no-print text-secondary">{{ produto.codigo_barras }}</td>
+                        <td class="text-white fw-bold">{{ produto.nome }}</td>
+                        <td class="fw-bold" style="color: #6ee7b7;">{{ "%.2f"|format(produto.preco_venda) }}</td>
+                        <td class="no-print text-center">
                             {% if produto.estoque_atual <= produto.estoque_minimo %}
-                                <span class="badge bg-warning text-dark">{{ produto.estoque_atual }} (Baixo)</span>
+                                <span class="badge badge-glass-warning py-1 px-2">{{ produto.estoque_atual }} (Baixo)</span>
                             {% else %}
-                                <span class="badge bg-info">{{ produto.estoque_atual }}</span>
+                                <span class="badge badge-glass-secondary py-1 px-2 text-white">{{ produto.estoque_atual }}</span>
                             {% endif %}
                         </td>
-                        <td class="no-print">
+                        <td class="no-print text-center">
                             {% if produto.ativo %}
-                                <span class="badge bg-success">Ativo</span>
+                                <span class="badge badge-glass-success py-1 px-2">Ativo</span>
                             {% else %}
-                                <span class="badge bg-danger">Inativo</span>
+                                <span class="badge badge-glass-danger py-1 px-2">Inativo</span>
                             {% endif %}
                         </td>
-                        <td class="no-print">
-                            <a href="{{ url_for('produtos_editar', id=produto.id) }}" class="btn btn-primary btn-sm"
-                               title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            
-                            {% if produto.ativo %}
-                            <form method="POST" action="{{ url_for('produtos_deletar', id=produto.id) }}" 
-                                  style="display: inline;"
-                                  onsubmit="return confirm('Tem certeza que deseja DESATIVAR este produto?');">
-                                <button type="submit" class="btn btn-danger btn-sm" title="Desativar">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </form>
-                            {% endif %}
+                        <td class="no-print text-center">
+                            <div class="btn-group">
+                                <a href="{{ url_for('produtos_editar', id=produto.id) }}" class="btn btn-glass btn-sm"
+                                   title="Editar" style="color: #93c5fd;">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                
+                                {% if produto.ativo %}
+                                <form method="POST" action="{{ url_for('produtos_deletar', id=produto.id) }}" 
+                                      style="display: inline;"
+                                      onsubmit="return confirm('Tem certeza que deseja DESATIVAR este produto?');">
+                                    <button type="submit" class="btn btn-glass btn-sm" title="Desativar" style="color: #fca5a5;">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" class="text-center">Nenhum produto cadastrado.</td>
+                        <td colspan="7" class="text-center p-4 text-secondary">
+                            <i class="fas fa-box-open fa-3x mb-3 opacity-50"></i>
+                            <p>Nenhum produto cadastrado no sistema.</p>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

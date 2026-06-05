@@ -3,84 +3,103 @@
 {% block title %}Fechar Caixa - Sistema de Caixa{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-cash-register"></i> Fechamento de Caixa</h1>
-    <a href="{{ url_for('cupom_fechamento') }}" class="btn btn-secondary" target="_blank">
-        <i class="fas fa-print"></i> Imprimir Relatório de Conferência
-    </a>
-</div>
-
-<div class="alert alert-info">
-    Caixa aberto pelo usuário <strong>{{ caixa_aberto.usuario.nome }}</strong> em {{ caixa_aberto.data_abertura.strftime('%d/%m/%Y às %H:%M:%S') }}.
-    <p class="mb-0">Seu saldo inicial foi de: <strong class="text-primary">R$ {{ "%.2f"|format(caixa_aberto.saldo_inicial) }}</strong></p>
-</div>
-
-<div class="row">
-    <div class="col-md-6">
-        <div class="card bg-light mb-3 border-primary">
-            <div class="card-header h5 bg-primary text-white">Resumo Esperado (Sistema)</div>
-            <div class="card-body">
-                <p>Saldo Inicial no Caixa: <strong>R$ {{ "%.2f"|format(caixa_aberto.saldo_inicial) }}</strong></p>
-                <hr>
-                <h6 class="card-title">Detalhamento de Recebimentos:</h6>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between">
-                        <i class="fas fa-money-bill-wave me-2"></i> **Dinheiro (A Receber):** <span class="fw-bold text-success">R$ {{ "%.2f"|format(totais.dinheiro) }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        <i class="fas fa-credit-card me-2"></i> Cartão (Crédito/Débito): 
-                        <span class="fw-bold text-success">R$ {{ "%.2f"|format(totais.cartao) }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        <i class="fas fa-qrcode me-2"></i> PIX: 
-                        <span class="fw-bold text-success">R$ {{ "%.2f"|format(totais.pix) }}</span>
-                    </li>
-                    
-                    {% for forma, total in totais.items() %}
-                        {% if forma not in ['dinheiro', 'cartao', 'pix', 'total_geral'] %}
-                            <li class="list-group-item d-flex justify-content-between">
-                                <i class="fas fa-wallet me-2"></i> {{ forma.title() }}: 
-                                <span class="fw-bold text-success">R$ {{ "%.2f"|format(total) }}</span>
-                            </li>
-                        {% endif %}
-                    {% endfor %}
-                    
-                    <li class="list-group-item d-flex justify-content-between list-group-item-info mt-2">
-                        <strong>Total Geral de Vendas:</strong>
-                        <strong class="text-primary">R$ {{ "%.2f"|format(totais.total_geral) }}</strong>
-                    </li>
-                </ul>
-                <hr>
-                <p>Total de Vendas Finalizadas: <strong>{{ total_vendas_count }}</strong></p>
-                <h4 class="mt-3 text-secondary">
-                    **SALDO ESPERADO EM DINHEIRO (Para Contagem Física):**
-                </h4>
-                <h3 class="fw-bold text-dark">R$ {{ "%.2f"|format(saldo_esperado_dinheiro) }}</h3>
+<div class="row justify-content-center pt-3 mt-4">
+    <div class="col-md-9">
+        <div class="glass-card shadow-lg" style="border-top: 4px solid #fca5a5;">
+            <div class="glass-card-header text-center pt-4 pb-3" style="background: rgba(0,0,0,0.15); border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <i class="fas fa-lock text-danger fa-3x mb-3" style="filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.5));"></i>
+                <h3 class="fw-bold mb-0 text-white">Fechar Caixa</h3>
             </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6">
-        <div class="card border-danger">
-            <div class="card-header h5 bg-danger text-white">Fechamento e Conferência</div>
-            <div class="card-body">
+            
+            <div class="glass-card-body p-4">
                 <form method="POST">
-                    <div class="mb-3">
-                        <label for="saldo_final" class="form-label h4">Valor Total Contado (Dinheiro Físico):</label>
-                        <input type="number" step="0.01" class="form-control form-control-lg text-end" id="saldo_final" name="saldo_final" required placeholder="0.00">
+                    <div class="row mb-4 g-4">
+                        <div class="col-md-6">
+                            <div class="p-4 rounded h-100" style="background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.2);">
+                                <h5 class="text-info border-bottom border-info border-opacity-25 pb-2 mb-3">
+                                    <i class="fas fa-chart-pie me-2"></i> Resumo do Período
+                                </h5>
+                                <p class="text-secondary mb-2"><strong class="text-white">Data Abertura:</strong> {{ caixa_aberto.data_abertura.strftime('%d/%m/%Y %H:%M') }}</p>
+                                <p class="text-secondary mb-3"><strong class="text-white">Total de Vendas:</strong> {{ totais.total_vendas_count }}</p>
+                                
+                                <div class="bg-dark bg-opacity-25 p-3 rounded">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-secondary"><i class="fas fa-money-bill-wave me-1"></i> Dinheiro:</span>
+                                        <span class="text-white fw-bold">R$ {{ "%.2f"|format(totais.dinheiro) }}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-secondary"><i class="fas fa-credit-card me-1"></i> Cartão:</span>
+                                        <span class="text-white fw-bold">R$ {{ "%.2f"|format(totais.cartao) }}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-secondary"><i class="fab fa-pix me-1"></i> PIX:</span>
+                                        <span class="text-white fw-bold">R$ {{ "%.2f"|format(totais.pix) }}</span>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary border-opacity-25">
+                                    <span class="text-info fw-bold">Valor Vendido Total:</span>
+                                    <span class="text-info fs-5 fw-bold">R$ {{ "%.2f"|format(totais.total_geral) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="p-4 rounded h-100" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2);">
+                                <h5 class="text-warning border-bottom border-warning border-opacity-25 pb-2 mb-3">
+                                    <i class="fas fa-clipboard-check me-2"></i> Info do Fechamento
+                                </h5>
+                                <p class="text-secondary mb-2"><strong class="text-white">Operador:</strong> {{ current_user.nome }}</p>
+                                <p class="text-secondary mb-3"><strong class="text-white">Data/Hora:</strong> {{ now.strftime('%d/%m/%Y %H:%M') }}</p>
+                                
+                                <div class="bg-dark bg-opacity-25 p-3 rounded">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-secondary">Saldo Inicial (Dinheiro):</span>
+                                        <span class="text-white">R$ {{ "%.2f"|format(caixa_aberto.saldo_inicial) }}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-secondary">+ Vendas (Dinheiro):</span>
+                                        <span class="text-white">R$ {{ "%.2f"|format(totais.dinheiro) }}</span>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary border-opacity-25">
+                                    <span class="text-warning fw-bold">Saldo Esperado (Dinheiro):</span>
+                                    <span class="text-warning fs-5 fw-bold">R$ {{ "%.2f"|format(saldo_esperado_dinheiro) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 p-4 rounded" style="background: rgba(0,0,0,0.2); border: 1px dashed rgba(255,255,255,0.2);">
+                        <label for="saldo_final" class="form-label text-white fw-bold fs-5 mb-3">Saldo Final em Caixa (Dinheiro Real Contado):</label>
+                        <div class="input-group input-group-lg mb-3">
+                            <span class="input-group-text border-0" style="background: rgba(0,0,0,0.4); color: #fca5a5;">
+                                <i class="fas fa-cash-register"></i>
+                            </span>
+                            <input type="number" step="0.01" class="form-control glass-input fw-bold text-success fs-4" id="saldo_final" 
+                                   name="saldo_final" required placeholder="0.00">
+                        </div>
+                        <div class="form-text text-secondary fs-6">
+                            Digite o valor total em <strong>dinheiro físico</strong> encontrado na gaveta. 
+                            Diferença calculada: <span id="diferenca" class="fw-bold px-2 py-1 rounded" style="background: rgba(0,0,0,0.3);">R$ 0.00</span>
+                        </div>
                     </div>
                     
-                    <div id="conferencia-resultado" class="alert alert-light mt-3" style="display: none;">
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <button type="submit" class="btn btn-glass-primary w-100 btn-lg py-3 fw-bold" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); border: none;">
+                                <i class="fas fa-lock me-2"></i> Confirmar Fechamento
+                            </button>
                         </div>
-
-                    <p class="text-muted mt-3">
-                        **Atenção:** O valor informado acima deve ser o valor total em dinheiro que está no caixa (saldo inicial + recebimentos em dinheiro).
-                    </p>
-                    
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-danger btn-lg mt-3" id="btn-fechar-caixa">
-                            <i class="fas fa-lock"></i> Confirmar Fechamento
-                        </button>
+                        <div class="col-md-4">
+                            <a href="{{ url_for('cupom_fechamento') }}" target="_blank" class="btn btn-glass w-100 h-100 d-flex align-items-center justify-content-center" style="color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4);">
+                                <i class="fas fa-print me-2"></i> Relatório Prévio
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('vendas') }}" class="btn btn-glass w-100 h-100 d-flex align-items-center justify-content-center text-secondary border-secondary">
+                                <i class="fas fa-arrow-left me-2"></i> Voltar
+                            </a>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -89,39 +108,30 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const inputSaldoFinal = document.getElementById('saldo_final');
-    const resultadoDiv = document.getElementById('conferencia-resultado');
-    const saldoEsperado = parseFloat({{ saldo_esperado_dinheiro | tojson }});
-
-    function conferirCaixa() {
-        const saldoFinalStr = inputSaldoFinal.value.replace(',', '.');
-        const saldoFinal = parseFloat(saldoFinalStr);
-
-        // Se o campo estiver vazio ou não for um número
-        if (isNaN(saldoFinal)) {
-            resultadoDiv.style.display = 'none';
-            return;
-        }
-
-        const diferenca = parseFloat((saldoFinal - saldoEsperado).toFixed(2));
-
-        resultadoDiv.style.display = 'block';
-        
-        if (diferenca === 0.00) {
-            resultadoDiv.className = 'alert alert-success mt-3';
-            resultadoDiv.innerHTML = '<i class="fas fa-check-circle"></i> **CONFERIDO!** O saldo está exato.';
-        } else if (diferenca > 0) {
-            resultadoDiv.className = 'alert alert-warning mt-3';
-            resultadoDiv.innerHTML = `<i class="fas fa-arrow-up"></i> **SOBRA!** Sobra de dinheiro físico: <strong class="text-success">R$ ${diferenca.toFixed(2).replace('.', ',')}</strong>`;
-        } else {
-            // Diferença negativa
-            resultadoDiv.className = 'alert alert-danger mt-3';
-            resultadoDiv.innerHTML = `<i class="fas fa-arrow-down"></i> **FALTA!** Falta de dinheiro físico: <strong class="text-danger">R$ ${Math.abs(diferenca).toFixed(2).replace('.', ',')}</strong>`;
-        }
+// Calcula diferença em tempo real
+document.getElementById('saldo_final').addEventListener('input', function() {
+    const saldoFinal = parseFloat(this.value) || 0;
+    
+    // MODIFICADO: Agora usa as variáveis corretas
+    const saldoInicial = {{ caixa_aberto.saldo_inicial }};
+    const totalVendasDinheiro = {{ total_vendas_dinheiro }}; // Apenas vendas em dinheiro
+    
+    const saldoEsperado = saldoInicial + totalVendasDinheiro;
+    const diferenca = saldoFinal - saldoEsperado;
+    
+    const diferencaElement = document.getElementById('diferenca');
+    diferencaElement.textContent = 'R$ ' + diferenca.toFixed(2);
+    
+    if (diferenca > 0) {
+        diferencaElement.className = 'fw-bold px-2 py-1 rounded text-success'; // Sobra
+        diferencaElement.style.background = 'rgba(16, 185, 129, 0.2)';
+    } else if (diferenca < 0) {
+        diferencaElement.className = 'fw-bold px-2 py-1 rounded text-danger'; // Falta
+        diferencaElement.style.background = 'rgba(239, 68, 68, 0.2)';
+    } else {
+        diferencaElement.className = 'fw-bold px-2 py-1 rounded text-primary'; // Correto
+        diferencaElement.style.background = 'rgba(59, 130, 246, 0.2)';
     }
-
-    inputSaldoFinal.addEventListener('input', conferirCaixa);
 });
 </script>
 {% endblock %}

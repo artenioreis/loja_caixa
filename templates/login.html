@@ -3,138 +3,253 @@
 {% block title %}Login - Sistema de Caixa{% endblock %}
 
 {% block extra_css %}
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-    /* ======================================================= */
-    /* INÍCIO DA CORREÇÃO (FUNDO SEMPRE PREENCHIDO)  */
-    /* ======================================================= */
-
-    /* 1. ESTILO PADRÃO (PARA TODAS AS TELAS) */
-    
-        /*background-image: url('https://wallpapers.com/images/hd/sky-blue-background-klsgg0p0wj4pd0cg.jpg');*/
-        body {
-        /* Agora carrega da pasta local, funciona sem internet */
-        background-image: url("{{ url_for('static', filename='images/fundo_login.jpg') }}");
-        
-        /* 'cover': Garante que a imagem cubra a tela inteira */
-        background-size: cover; 
-        
-        /* 'center': Centraliza a imagem */
-        background-position: center center;
-
-        background-repeat: no-repeat;
-        background-attachment: fixed; /* Mantém o fundo fixo ao rolar */
+    body {
+        margin: 0;
+        font-family: 'Outfit', sans-serif;
+        background: url('https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop');
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        background-color: #0f172a; /* Fallback */
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    /* Em telas de celular, o card de login deve ser mais opaco para legibilidade */
-    .card-login {
-        /* Quase opaco para garantir que o formulário seja legível */
-        background-color: rgba(255, 255, 255, 0.98); 
-        backdrop-filter: blur(5px);
+    .bg-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.7) 0%, rgba(30, 41, 59, 0.4) 100%);
+        z-index: 0;
+        backdrop-filter: blur(4px);
     }
-    
-    /* 2. AJUSTE PARA TELAS MAIORES (DESKTOP) */
-    @media (min-width: 768px) {
-        
-        /* As regras do 'body' foram removidas daqui
-           para que 'cover' e 'center' se apliquem sempre.
-        */
 
-        /* Em telas de desktop, o card pode ser um pouco mais transparente */
-        .card-login {
-            background-color: rgba(255, 255, 255, 0.95);
-        }
+    .login-container {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 2rem 1rem;
+        transform: translateY(-8vh); /* Move everything up slightly */
     }
-    /* ======================================================= */
-    /* FIM DA CORREÇÃO                                */
-    /* ======================================================= */
 
-    /* ======================================================= */
-    /* NOVO ESTILO PARA O LOGO (LOGIN)               */
-    /* ======================================================= */
     .logo-login {
-        max-width: 250px; /* Largura máxima do logo */
-        margin-bottom: 1rem; /* Espaçamento abaixo do logo */
-        filter: drop-shadow(2px 2px 3px rgba(13, 13, 14, 1)); /* Sombra suave */
-    }
-    /* ======================================================= */
-    
-    /* CSS PARA DIMINUIR OS INPUTS (MANTIDO) */
-    .form-control-sm-custom {
-        /* Diminui a altura e o padding do campo de texto */
-        height: calc(1.5em + 0.5rem + 2px);
-        padding: 0.25rem 0.5rem;
-        font-size: 0.9rem; /* Tamanho da fonte ligeiramente menor */
+        max-width: 220px; /* Logo slightly smaller */
+        margin-bottom: 1.5rem; /* Less margin below logo */
+        filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
+        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
     
-    .input-group-text-sm-custom {
-        /* Diminui o padding do ícone para acompanhar o input */
-        padding: 0.25rem 0.5rem;
-        font-size: 0.9rem;
+    .logo-login:hover {
+        transform: scale(1.05) translateY(-5px);
     }
-    /* --- FIM DO NOVO CSS --- */
+
+    .card-login {
+        background: rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 28px;
+        box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.3);
+        overflow: hidden;
+        width: 100%;
+        max-width: 440px;
+        padding: 3rem 2.5rem;
+        color: white;
+        transform: translateY(0);
+        transition: transform 0.4s ease, box-shadow 0.4s ease;
+    }
+
+    .card-login:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 40px 70px -15px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.4);
+    }
+
+    .card-login h4 {
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        font-size: 1.85rem;
+        text-align: center;
+        letter-spacing: -0.5px;
+    }
+
+    .card-login p {
+        text-align: center;
+        color: rgba(255, 255, 255, 0.75);
+        margin-bottom: 2.5rem;
+        font-weight: 300;
+        font-size: 1.05rem;
+    }
+
+    .form-label {
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.9);
+        margin-bottom: 0.6rem;
+        font-size: 0.95rem;
+        letter-spacing: 0.3px;
+        margin-left: 0.3rem;
+    }
+
+    .input-group-custom {
+        position: relative;
+        margin-bottom: 1.8rem;
+    }
+
+    .input-group-custom i {
+        position: absolute;
+        left: 1.2rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: rgba(255, 255, 255, 0.6);
+        z-index: 10;
+        transition: color 0.3s ease;
+        font-size: 1.1rem;
+    }
+
+    .form-control-custom {
+        background: rgba(0, 0, 0, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        padding: 0.9rem 1rem 0.9rem 3rem;
+        color: white;
+        width: 100%;
+        font-size: 1.05rem;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        outline: none;
+        box-sizing: border-box;
+    }
+
+    .form-control-custom::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+        font-weight: 300;
+    }
+
+    .form-control-custom:focus {
+        background: rgba(0, 0, 0, 0.4);
+        border-color: rgba(255, 255, 255, 0.6);
+        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.15);
+    }
+
+    .form-control-custom:focus + i,
+    .input-group-custom:focus-within i {
+        color: white;
+    }
+
+    .btn-login {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        color: white;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 16px;
+        padding: 1rem 1.5rem;
+        font-size: 1.15rem;
+        font-weight: 600;
+        width: 100%;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.6rem;
+        margin-top: 1.5rem;
+        box-shadow: 0 8px 20px -4px rgba(37, 99, 235, 0.6);
+    }
+
+    .btn-login:hover {
+        background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+        box-shadow: 0 12px 25px -4px rgba(37, 99, 235, 0.7);
+        transform: translateY(-3px);
+    }
+
+    .btn-login:active {
+        transform: translateY(1px);
+        box-shadow: 0 4px 10px -4px rgba(37, 99, 235, 0.5);
+    }
+
+    /* Custom alert styling */
+    .alert-glass {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        border-radius: 14px;
+        margin-bottom: 1.8rem;
+        padding: 1rem 1.2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .alert-glass.alert-danger {
+        background: rgba(239, 68, 68, 0.25);
+        border-color: rgba(239, 68, 68, 0.5);
+        color: #fecaca;
+    }
+
+    .alert-glass.alert-success {
+        background: rgba(34, 197, 94, 0.25);
+        border-color: rgba(34, 197, 94, 0.5);
+        color: #bbf7d0;
+    }
+    
+    .alert-glass .btn-close-white {
+        filter: brightness(0) invert(1);
+        opacity: 0.8;
+    }
+    .alert-glass .btn-close-white:hover {
+        opacity: 1;
+    }
 
 </style>
 {% endblock %}
 
 {% block content_public %}
-<div class="container-fluid min-vh-100 d-flex flex-column align-items-center pt-3 p-3">
+<div class="bg-overlay"></div>
+<div class="login-container">
+    <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="logo-login">
     
-    <div>
-        <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="img-fluid logo-login">
-    </div>
-    <div class="row justify-content-center w-100">
-        <div class="col-11 col-sm-8 col-md-6 col-lg-4 col-xl-3">
-            <div class="card shadow card-login">
-                <div class="card-header bg-primary text-white text-center">
-                    <h4><i class="fas fa-cash-register"></i> Sistema de Caixa</h4>
-                    <small>Faça login para continuar</small>
-                </div>
-                <div class="card-body p-4">
-                    
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert" style="font-size: 0.9rem;">
-                                    {{ message }}
-                                    <button type="button" class="btn-close pt-2" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
-                    <form method="POST" action="{{ url_for('login') }}">
-                        <div class="mb-3">
-                            <label for="email" class="form-label">Email:</label>
-                            <div class="input-group">
-                                <span class="input-group-text input-group-text-sm-custom">
-                                    <i class="fas fa-envelope"></i>
-                                </span>
-                                <input type="email" class="form-control form-control-sm-custom" id="email" name="email" required 
-                                       placeholder="seu@email.com">
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="senha" class="form-label">Senha:</label>
-                            <div class="input-group">
-                                <span class="input-group-text input-group-text-sm-custom">
-                                    <i class="fas fa-lock"></i>
-                                </span>
-                                <input type="password" class="form-control form-control-sm-custom" id="senha" name="senha" required 
-                                       placeholder="Sua senha">
-                            </div>
-                        </div>
-                        
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-sign-in-alt"></i> Entrar
-                            </button>
-                        </div>
-                    </form>
-                </div>
-                
-                </div>
+    <div class="card-login">
+        <h4>Bem-vindo de volta</h4>
+        <p>Acesse o Sistema de Caixa</p>
 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-glass alert-{{ 'danger' if category == 'error' else category }} d-flex align-items-center alert-dismissible fade show" role="alert">
+                        <i class="fas {% if category == 'success' %}fa-check-circle{% else %}fa-exclamation-circle{% endif %} me-3 fs-5"></i>
+                        <div class="flex-grow-1">{{ message }}</div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="mb-2">
+                <label for="email" class="form-label">E-mail</label>
+                <div class="input-group-custom">
+                    <i class="fas fa-envelope"></i>
+                    <input type="email" class="form-control-custom" id="email" name="email" required placeholder="seu@email.com">
+                </div>
             </div>
+            
+            <div class="mb-2">
+                <label for="senha" class="form-label">Senha</label>
+                <div class="input-group-custom">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" class="form-control-custom" id="senha" name="senha" required placeholder="••••••••">
+                </div>
+            </div>
+            
+            <button type="submit" class="btn-login">
+                Entrar no Sistema <i class="fas fa-arrow-right ms-2"></i>
+            </button>
+        </form>
     </div>
 </div>
 {% endblock %}

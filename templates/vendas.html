@@ -6,7 +6,7 @@
 <style>
     /* Estilo para a lista de itens da venda (carrinho) */
     .carrinho-lista {
-        max-height: 400px;
+        max-height: 500px;
         overflow-y: auto;
     }
     .total-display {
@@ -75,205 +75,272 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-shopping-cart"></i> PDV - Ponto de Venda</h1>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom border-secondary border-opacity-25">
+    <h1 class="h2 text-white fw-bold"><i class="fas fa-shopping-cart text-primary me-2"></i> Frente de Caixa (PDV)</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
-        <span class="badge bg-success fs-6">
-            <i class="fas fa-lock-open"></i> Caixa Aberto (Saldo Inicial: R$ {{ "%.2f"|format(movimento_atual.saldo_inicial) }})
+        <span class="badge badge-glass-success fs-6 px-3 py-2 rounded-pill">
+            <i class="fas fa-lock-open me-1"></i> Caixa Aberto (Saldo Inicial: R$ {{ "%.2f"|format(movimento_atual.saldo_inicial) }})
         </span>
     </div>
 </div>
 
 <div class="row">
+    <!-- Painel de Lançamento -->
     <div class="col-md-5">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-barcode"></i> Lançar Produto</h5>
+        <div class="glass-card mb-4">
+            <div class="glass-card-header">
+                <i class="fas fa-barcode text-primary me-2"></i> Lançar Produto
             </div>
-            <div class="card-body">
+            <div class="glass-card-body">
                 <div class="mb-3">
-                    <label for="codigo_barras" class="form-label">Código de Barras ou ID:</label>
-                    <input type="text" class="form-control form-control-lg" id="codigo_barras" 
+                    <label for="codigo_barras" class="form-label text-secondary fw-bold">Código de Barras ou ID:</label>
+                    <input type="text" class="form-control form-control-lg glass-input" id="codigo_barras" 
                            placeholder="Leia o código ou digite..." autofocus>
                 </div>
                 
-                <div id="produto-info" class="text-center p-3 bg-light rounded">
-                    <p class="text-muted">Aguardando produto...</p>
+                <div id="produto-info" class="text-center p-3 rounded" style="background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.05); min-height: 180px;">
+                    <p class="text-muted mt-4">Aguardando produto...</p>
                 </div>
                 
-                <div class="row mt-3">
-                    <div class="col-md-6 mb-2">
-                        <label for="quantidade" class="form-label">Quantidade:</label>
-                        <input type="number" class="form-control" id="quantidade" value="1" min="1">
+                <div class="row mt-4">
+                    <div class="col-md-5 mb-2">
+                        <label for="quantidade" class="form-label text-secondary fw-bold">Quantidade:</label>
+                        <input type="number" class="form-control glass-input fs-5" id="quantidade" value="1" min="1">
                     </div>
-                    <div class="col-md-6 d-grid align-items-end">
-                        <button class="btn btn-primary" id="btn-adicionar">
-                            <i class="fas fa-plus"></i> Adicionar (Enter)
+                    <div class="col-md-7 d-grid align-items-end">
+                        <button class="btn btn-glass-primary btn-lg mb-2" id="btn-adicionar">
+                            <i class="fas fa-plus me-1"></i> Adicionar <small>(Enter)</small>
                         </button>
                     </div>
                 </div>
             </div>
         </div>
         
-        <div class="card mt-3">
-            <div class="card-body">
-                <h6 class="card-title">Atalhos</h6>
-                <p><kbd>Enter</kbd> - Adicionar Item</p>
-                <p><kbd>F2</kbd> - Buscar Produto por Nome</p>
-                <p><kbd>F6</kbd> - Finalizar Venda</p>
-                <p><kbd>F3</kbd> - Cancelar Venda</p>
+        <div class="glass-card mb-4">
+            <div class="glass-card-body p-3">
+                <h6 class="text-secondary fw-bold mb-3"><i class="fas fa-keyboard me-2"></i> Atalhos do Sistema</h6>
+                <div class="row g-2 text-white" style="font-size: 0.9rem;">
+                    <div class="col-6"><kbd class="bg-primary">Enter</kbd> Adicionar</div>
+                    <div class="col-6"><kbd class="bg-info">F2</kbd> Buscar Nome</div>
+                    <div class="col-6"><kbd class="bg-success">F6</kbd> Finalizar</div>
+                    <div class="col-6"><kbd class="bg-danger">F3</kbd> Cancelar</div>
+                    {% if orcamento_ativo %}
+                    <div class="col-6"><kbd class="bg-warning text-dark">F4</kbd> Gerar Orç.</div>
+                    <div class="col-6"><kbd class="bg-secondary">F8</kbd> Listar Orç.</div>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Carrinho de Compras -->
     <div class="col-md-7">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-list-ul"></i> Itens da Venda</h5>
+        <div class="glass-card h-100 d-flex flex-column">
+            <div class="glass-card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-list-ul text-info me-2"></i> Itens da Venda</span>
+                <span id="badge-orcamento" class="badge badge-glass-warning d-none"></span>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive carrinho-lista">
-                    <table class="table table-striped table-hover mb-0">
-                        <thead class="table-dark">
+            <div class="glass-card-body p-0 flex-grow-1">
+                <div class="table-responsive carrinho-lista glass-table-wrapper border-0 rounded-0">
+                    <table class="glass-table mb-0 fs-6 align-middle">
+                        <thead>
                             <tr>
-                                <th scope="col">#</th>
+                                <th scope="col" style="width: 5%;">#</th>
                                 <th scope="col">Produto</th>
-                                <th scope="col">Qtd.</th>
+                                <th scope="col" style="width: 25%;">Qtd.</th>
                                 <th scope="col">Vl. Unit.</th>
                                 <th scope="col">Subtotal</th>
-                                <th scope="col">Ação</th>
+                                <th scope="col" style="width: 10%;">Ação</th>
                             </tr>
                         </thead>
                         <tbody id="carrinho-tbody">
-                            </tbody>
+                            <!-- Itens do carrinho são inseridos aqui via JS -->
+                        </tbody>
                     </table>
                 </div>
             </div>
-            <div class="card-footer">
-                <div class="row total-display p-3 align-items-center">
-                    <div class="col-md-6">
-                        <h4>Total de Itens: <span id="total-itens" class="fw-bold">0</span></h4>
+            
+            <div class="p-4" style="background: rgba(0,0,0,0.25); border-top: 1px solid rgba(255,255,255,0.05);">
+                <div class="row align-items-center mb-3 p-3 rounded" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
+                    <div class="col-md-5 text-center text-md-start mb-2 mb-md-0">
+                        <h5 class="text-secondary mb-0">Total de Itens: <span id="total-itens" class="text-white fw-bold ms-2">0</span></h5>
                     </div>
-                    <div class="col-md-6 text-end">
-                        <h2 class="mb-0">Total: <span id="total-venda" class="fw-bold text-success">R$ 0.00</span></h2>
+                    <div class="col-md-7 text-center text-md-end">
+                        <h2 class="mb-0 fw-bold d-flex align-items-center justify-content-md-end justify-content-center">
+                            <span class="text-secondary me-3" style="font-size: 1.2rem;">TOTAL A PAGAR</span>
+                            <span id="total-venda" class="text-success" style="font-size: 2.2rem; filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.4));">R$ 0.00</span>
+                        </h2>
                     </div>
                 </div>
-                <div class="d-grid gap-2 mt-3">
-                    <button class="btn btn-success btn-lg" id="btn-finalizar" data-bs-toggle="modal" data-bs-target="#modalFinalizar">
-                        <i class="fas fa-check"></i> Finalizar Venda (F6)
-                    </button>
-                    <button class="btn btn-danger" id="btn-cancelar">
-                        <i class="fas fa-times"></i> Cancelar Venda (F3)
-                    </button>
+                
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <button class="btn btn-glass-success w-100 py-3 fs-5 fw-bold" id="btn-finalizar" data-bs-toggle="modal" data-bs-target="#modalFinalizar">
+                            <i class="fas fa-check-circle me-2"></i> Finalizar Venda (F6)
+                        </button>
+                    </div>
+                    <div class="col-md-6 d-flex flex-column gap-2">
+                        <div class="d-flex gap-2 h-50">
+                            {% if orcamento_ativo %}
+                            <button class="btn btn-glass w-50" id="btn-orcamento" style="color: #fde68a; border-color: rgba(245, 158, 11, 0.4);">
+                                <i class="fas fa-file-invoice-dollar"></i> Gerar Orç. (F4)
+                            </button>
+                            <button class="btn btn-glass w-50" id="btn-listar-orcamentos" data-bs-toggle="modal" data-bs-target="#modalBuscarOrcamento" style="color: #bae6fd; border-color: rgba(14, 165, 233, 0.4);">
+                                <i class="fas fa-list"></i> Ver Orç. (F8)
+                            </button>
+                            {% else %}
+                            <button class="btn btn-glass w-100" disabled style="opacity: 0.5;">
+                                <i class="fas fa-file-invoice-dollar"></i> Orçamentos Desativados
+                            </button>
+                            {% endif %}
+                        </div>
+                        <button class="btn btn-glass w-100 h-50" id="btn-cancelar" style="color: #fca5a5; border-color: rgba(239, 68, 68, 0.4);">
+                            <i class="fas fa-times me-2"></i> Cancelar Venda (F3)
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- ======================================================= -->
+<!--           INÍCIO DO NOVO HTML (MODAL DE BUSCA)          -->
+<!-- ======================================================= -->
 <div class="modal fade" id="modalBuscarProduto" tabindex="-1" aria-labelledby="modalBuscarProdutoLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="modalBuscarProdutoLabel"><i class="fas fa-search"></i> Buscar Produto por Nome</h5>
+        <div class="modal-content glass-card border-0">
+            <div class="modal-header" style="background: rgba(59, 130, 246, 0.2); border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <h5 class="modal-title fw-bold" id="modalBuscarProdutoLabel"><i class="fas fa-search text-primary me-2"></i> Buscar Produto por Nome</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <div class="mb-3">
-                    <label for="input-busca-nome" class="form-label">Digite o nome ou código do produto:</label>
-                    <input type="text" class="form-control form-control-lg" id="input-busca-nome" placeholder="Ex: Arroz ou 789...">
+                    <label for="input-busca-nome" class="form-label text-secondary fw-bold">Digite o nome ou código do produto:</label>
+                    <input type="text" class="form-control form-control-lg glass-input" id="input-busca-nome" placeholder="Ex: Arroz ou 789...">
                 </div>
-                <hr>
-                <div id="lista-resultados-busca">
-                    <p class="text-center text-muted">Aguardando digitação (mín. 2 caracteres)...</p>
-                    </div>
+                <hr class="border-secondary border-opacity-25 my-4">
+                <div id="lista-resultados-busca" class="p-3 rounded" style="background: rgba(0,0,0,0.2); border: 1px dashed rgba(255,255,255,0.1);">
+                    <p class="text-center text-muted mb-0">Aguardando digitação (mín. 2 caracteres)...</p>
+                    <!-- Os resultados da busca serão inseridos aqui pelo JavaScript -->
+                </div>
             </div>
         </div>
     </div>
 </div>
+<!-- ======================================================= -->
+<!--             FIM DO NOVO HTML (MODAL DE BUSCA)           -->
+<!-- ======================================================= -->
 
-<div class="modal fade" id="modalFinalizar" tabindex="-1" aria-labelledby="modalFinalizarLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl"> <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title" id="modalFinalizarLabel"><i class="fas fa-check"></i> Finalizar Venda</h5>
+<!-- ======================================================= -->
+<!--           INÍCIO DO NOVO HTML (MODAL DE ORÇAMENTOS)     -->
+<!-- ======================================================= -->
+<div class="modal fade" id="modalBuscarOrcamento" tabindex="-1" aria-labelledby="modalBuscarOrcamentoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-card border-0">
+            <div class="modal-header" style="background: rgba(14, 165, 233, 0.2); border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <h5 class="modal-title fw-bold" id="modalBuscarOrcamentoLabel"><i class="fas fa-list text-info me-2"></i> Orçamentos Pendentes</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-6 border-end">
-                        <h4 class="mb-3"><i class="fas fa-credit-card"></i> Adicionar Pagamento</h4>
+            <div class="modal-body p-0">
+                <div class="table-responsive glass-table-wrapper border-0 rounded-0">
+                    <table class="glass-table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Data</th>
+                                <th>Operador</th>
+                                <th>Total</th>
+                                <th class="text-center">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-orcamentos-body">
+                            <tr><td colspan="5" class="text-center p-4 text-muted">Carregando orçamentos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ======================================================= -->
+<!--             FIM DO NOVO HTML (MODAL DE ORÇAMENTOS)      -->
+<!-- ======================================================= -->
 
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <label for="forma_pagamento_add" class="form-label">Forma de Pagamento:</label>
-                                <select class="form-select" id="forma_pagamento_add">
-                                    <option value="dinheiro">Dinheiro</option>
-                                    <option value="cartao">Cartão</option>
-                                    <option value="pix">PIX</option>
-                                </select>
-                            </div>
-                            <div class="col-6">
-                                <label for="valor_pagamento_add" class="form-label">Valor (R$):</label>
-                                <input type="number" step="0.01" class="form-control" id="valor_pagamento_add" placeholder="0.00">
-                            </div>
-                        </div>
-                        <div class="d-grid mb-4">
-                            <button class="btn btn-info" id="btn-adicionar-pagamento">
-                                <i class="fas fa-plus"></i> Adicionar Pagamento
-                            </button>
+
+<!-- Modal Finalizar (Existente) -->
+<div class="modal fade" id="modalFinalizar" tabindex="-1" aria-labelledby="modalFinalizarLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-card border-0" style="border-top: 4px solid #10b981 !important;">
+            <div class="modal-header" style="background: rgba(16, 185, 129, 0.15); border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <h5 class="modal-title fw-bold" id="modalFinalizarLabel"><i class="fas fa-check-circle text-success me-2"></i> Finalizar Venda</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="mb-4">
+                            <label for="forma_pagamento" class="form-label text-secondary fw-bold">Forma de Pagamento:</label>
+                            <select class="form-select form-select-lg glass-input" id="forma_pagamento">
+                                <option value="dinheiro" class="text-dark">Dinheiro</option>
+                                <option value="cartao" class="text-dark">Cartão</option>
+                                <option value="pix" class="text-dark">PIX</option>
+                                <option value="multiplo" class="text-dark">Múltiplo</option>
+                            </select>
                         </div>
                         
-                        <h5 class="mb-3"><i class="fas fa-file-invoice"></i> Pagamentos Registrados</h5>
-                        <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
-                            <table class="table table-striped table-sm mb-0">
-                                <thead class="table-primary">
-                                    <tr>
-                                        <th>Forma</th>
-                                        <th>Valor (R$)</th>
-                                        <th>Ação</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="pagamentos-tbody">
-                                    </tbody>
-                            </table>
+                        <div class="mb-4" id="campo-valor-pago">
+                            <label for="valor_pago" class="form-label text-secondary fw-bold">Valor Pago (R$):</label>
+                            <input type="number" step="0.01" class="form-control form-control-lg glass-input text-info fw-bold" id="valor_pago" placeholder="0.00">
                         </div>
-
-                        <div class="alert alert-info mt-3" id="campo-pix-qrcode" style="display: none;">
-                            <p class="mb-1 fw-bold">Pague com PIX</p>
-                            <p class="text-muted" style="font-size: 0.9rem;">
-                                Aponte a câmera para o QR Code (Valor Pix: R$ <span id="modal-total-pix">0.00</span>).
+                        
+                        <div id="campos-multiplo" style="display: none;">
+                            <div class="p-3 rounded mb-3" style="background: rgba(0,0,0,0.2); border: 1px dashed rgba(255,255,255,0.1);">
+                                <div class="mb-3">
+                                    <label for="valor_multiplo_dinheiro" class="form-label text-secondary fw-bold"><i class="fas fa-money-bill-wave me-1"></i> Em Dinheiro (R$):</label>
+                                    <input type="number" step="0.01" class="form-control glass-input" id="valor_multiplo_dinheiro" placeholder="0.00">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="valor_multiplo_cartao" class="form-label text-secondary fw-bold"><i class="fas fa-credit-card me-1"></i> No Cartão (R$):</label>
+                                    <input type="number" step="0.01" class="form-control glass-input" id="valor_multiplo_cartao" placeholder="0.00">
+                                </div>
+                                <div class="mb-2">
+                                    <label for="valor_multiplo_pix" class="form-label text-secondary fw-bold"><i class="fab fa-pix me-1"></i> No PIX (R$):</label>
+                                    <input type="number" step="0.01" class="form-control glass-input" id="valor_multiplo_pix" placeholder="0.00">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3 text-center p-3 rounded" id="campo-pix-qrcode" style="display: none; background: rgba(0,0,0,0.2);">
+                            <label class="form-label text-white fw-bold"><i class="fab fa-pix text-info me-2"></i> Pague com PIX</label>
+                            <p class="text-secondary" style="font-size: 0.9rem;">
+                                Aponte a câmera para o QR Code e transfira o valor exato (R$ <span id="modal-total-pix" class="text-white fw-bold">0.00</span>).
                             </p>
+                            
                             <img src="{{ url_for('static', filename='images/qrcode_pix_loja.png') }}" 
                                  alt="QR Code PIX da Loja" 
-                                 class="img-fluid rounded border" 
-                                 style="max-width: 150px;">
+                                 class="img-fluid rounded border border-secondary p-1 bg-white" 
+                                 style="max-width: 200px;">
                         </div>
-
                     </div>
                     
-                    <div class="col-md-6 bg-light p-4 rounded d-flex flex-column justify-content-between">
-                        <div>
-                            <h3 class="mb-3 text-secondary">Total da Venda:</h3>
-                            <h1 id="modal-total-venda" class="display-5 fw-bold text-dark">R$ 0.00</h1>
-                            <hr>
+                    <div class="col-md-6">
+                        <div class="p-4 rounded h-100 d-flex flex-column justify-content-center align-items-center text-center" style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.05);">
+                            <h5 class="text-secondary mb-2">Total a Pagar:</h5>
+                            <h1 id="modal-total-venda" class="display-5 fw-bold mb-4" style="color: #6ee7b7; filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.4));">R$ 0.00</h1>
                             
-                            <h3 class="mb-3 text-secondary">Total Pago:</h3>
-                            <h1 id="modal-total-pago" class="display-5 fw-bold text-success">R$ 0.00</h1>
-                            <hr>
-
-                            <h3 class="mb-3 text-secondary">Troco:</h3>
-                            <h1 id="modal-troco" class="display-6 fw-bold text-primary">R$ 0.00</h1>
-                        </div>
-                        <div class="alert mt-3" id="alerta-status">
-                            Verifique se o valor pago é suficiente.
+                            <div class="w-100 border-top border-secondary border-opacity-25 my-2"></div>
+                            
+                            <h5 class="text-secondary mt-3 mb-2">Troco a Devolver:</h5>
+                            <h1 id="modal-troco" class="display-6 fw-bold text-info mb-0">R$ 0.00</h1>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Voltar</button>
-                <button type="button" class="btn btn-success btn-lg" id="btn-confirmar-venda" disabled>
-                    <i class="fas fa-save"></i> Confirmar Venda
+            <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.05);">
+                <button type="button" class="btn btn-glass px-4" data-bs-dismiss="modal">Voltar</button>
+                <button type="button" class="btn btn-glass-success btn-lg px-4 fw-bold shadow" id="btn-confirmar-venda">
+                    <i class="fas fa-save me-2"></i> Confirmar Venda
                 </button>
             </div>
         </div>
@@ -289,8 +356,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // VARIÁVEIS DE ESTADO
     // =========================================================================
     let carrinho = []; // Armazena os itens da venda ( [{id, nome, preco, qtd, subtotal}, ...] )
-    let pagamentos = []; // NOVO: Armazena os pagamentos [ {forma_pagamento: 'dinheiro', valor: 15.00}, ...]
-    let produtoAtual = null; 
+    let produtoAtual = null; // Armazena o último produto buscado
+    let orcamentoCarregadoId = null; // Armazena o ID do orçamento se um for carregado
     
     // =========================================================================
     // ELEMENTOS DOM
@@ -303,29 +370,38 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalItensSpan = document.getElementById('total-itens');
     const totalVendaSpan = document.getElementById('total-venda');
     const btnFinalizar = document.getElementById('btn-finalizar');
+    const btnOrcamento = document.getElementById('btn-orcamento');
     const btnCancelar = document.getElementById('btn-cancelar');
     
-    // --- Modal Buscar Produto ---
+    // --- Modal Finalizar (Existente) ---
+    const modalFinalizarVenda = new bootstrap.Modal(document.getElementById('modalFinalizar'));
+    const modalTotalVenda = document.getElementById('modal-total-venda');
+    const modalTroco = document.getElementById('modal-troco');
+    const selectFormaPagamento = document.getElementById('forma_pagamento');
+    const inputValorPago = document.getElementById('valor_pago');
+    const campoValorPago = document.getElementById('campo-valor-pago');
+    const btnConfirmarVenda = document.getElementById('btn-confirmar-venda');
+    
+    // --- Novos campos para múltiplo ---
+    const camposMultiplo = document.getElementById('campos-multiplo');
+    const inputValorMultiploDinheiro = document.getElementById('valor_multiplo_dinheiro');
+    const inputValorMultiploCartao = document.getElementById('valor_multiplo_cartao');
+    const inputValorMultiploPix = document.getElementById('valor_multiplo_pix');
+    
+    // --- Elementos PIX (Existente) ---
+    const campoPixQrcode = document.getElementById('campo-pix-qrcode');
+    const modalTotalPix = document.getElementById('modal-total-pix');
+
+    // =========================================================================
+    //           INÍCIO DOS NOVOS ELEMENTOS (MODAL DE BUSCA)
+    // =========================================================================
     const modalBusca = new bootstrap.Modal(document.getElementById('modalBuscarProduto'));
     const inputBuscaNome = document.getElementById('input-busca-nome');
     const listaResultadosBusca = document.getElementById('lista-resultados-busca');
-    let buscaTypingTimer; 
-    
-    // --- Modal Finalizar (NOVOS e REFATORADOS) ---
-    const modalFinalizarVenda = new bootstrap.Modal(document.getElementById('modalFinalizar'));
-    const modalTotalVenda = document.getElementById('modal-total-venda');
-    const modalTotalPago = document.getElementById('modal-total-pago'); // NOVO
-    const modalTroco = document.getElementById('modal-troco');
-    const btnConfirmarVenda = document.getElementById('btn-confirmar-venda');
-    const alertaStatus = document.getElementById('alerta-status');
-
-    // --- Campos de Adição de Pagamento (NOVOS) ---
-    const selectFormaPagamentoAdd = document.getElementById('forma_pagamento_add');
-    const inputValorPagamentoAdd = document.getElementById('valor_pagamento_add');
-    const btnAdicionarPagamento = document.getElementById('btn-adicionar-pagamento');
-    const pagamentosTbody = document.getElementById('pagamentos-tbody');
-    const campoPixQrcode = document.getElementById('campo-pix-qrcode');
-    const modalTotalPix = document.getElementById('modal-total-pix');
+    let buscaTypingTimer; // Timer para o debounce da busca por nome
+    // =========================================================================
+    //             FIM DOS NOVOS ELEMENTOS
+    // =========================================================================
 
     // =========================================================================
     // FUNÇÕES PRINCIPAIS
@@ -403,26 +479,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Verifica se o item já está no carrinho
         const itemExistente = carrinho.find(item => item.id === produtoAtual.id);
-        const estoqueAtual = produtoAtual.estoque_atual;
+        
+        let qtdDesejada = quantidade;
+        if (itemExistente) {
+            qtdDesejada += itemExistente.qtd;
+        }
+        
+        // Verifica o estoque
+        if (qtdDesejada > produtoAtual.estoque_atual) {
+            alert(`Estoque insuficiente! O estoque atual é de ${produtoAtual.estoque_atual} unidade(s).`);
+            inputQuantidade.focus();
+            return;
+        }
 
         if (itemExistente) {
-             // 1. Verifica se a soma total não excede o estoque
-             if (itemExistente.qtd + quantidade > estoqueAtual) {
-                 alert(`Estoque insuficiente. Tentativa: ${itemExistente.qtd + quantidade}, Disponível: ${estoqueAtual}`);
-                 return;
-             }
-             
-            // 2. Atualiza a quantidade
+            // Apenas atualiza a quantidade
             itemExistente.qtd += quantidade;
             itemExistente.subtotal = itemExistente.preco * itemExistente.qtd;
-            
         } else {
-            // Validação de estoque para novo item
-            if (quantidade > estoqueAtual) {
-                 alert(`Estoque insuficiente para ${produtoAtual.nome}. Disponível: ${estoqueAtual}`);
-                 return;
-            }
-
             // Adiciona novo item
             carrinho.push({
                 id: produtoAtual.id,
@@ -430,7 +504,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 preco: produtoAtual.preco_venda,
                 qtd: quantidade,
                 subtotal: produtoAtual.preco_venda * quantidade,
-                estoque_atual: estoqueAtual 
+                estoque_atual: produtoAtual.estoque_atual
             });
         }
         
@@ -453,20 +527,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${index + 1}</td>
-                <td>${item.nome}</td>
-                <td style="width: 100px;">
-                    <input type="number" 
-                           class="form-control form-control-sm text-center" 
-                           value="${item.qtd}" 
-                           min="1" 
-                           max="${item.estoque_atual}"
-                           onchange="atualizarQuantidadeItem(${item.id}, this.value)">
-                </td>
-                <td>R$ ${item.preco.toFixed(2)}</td>
-                <td>R$ ${item.subtotal.toFixed(2)}</td>
+                <td><strong class="text-secondary">${index + 1}</strong></td>
+                <td class="fw-bold text-white">${item.nome}</td>
                 <td>
-                    <button class="btn btn-danger btn-sm" onclick="removerItemCarrinho(${item.id})">
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-glass px-2 py-0 fs-5" onclick="alterarQuantidadeItem(${item.id}, -1)" title="Diminuir unidade">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <span class="badge badge-glass-secondary fs-5 px-3 py-1">${item.qtd}</span>
+                        <button class="btn btn-sm btn-glass px-2 py-0 fs-5" onclick="alterarQuantidadeItem(${item.id}, 1)" title="Aumentar unidade">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </td>
+                <td class="text-secondary">R$ ${item.preco.toFixed(2)}</td>
+                <td class="fw-bold" style="color: #6ee7b7;">R$ ${item.subtotal.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-glass px-3" style="color: #fca5a5; border-color: rgba(239, 68, 68, 0.4);" onclick="removerItemCarrinho(${item.id})" title="Remover item">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
@@ -478,45 +555,39 @@ document.addEventListener('DOMContentLoaded', function() {
         totalItensSpan.textContent = totalItens;
         totalVendaSpan.textContent = `R$ ${totalVenda.toFixed(2)}`;
         
+        // Atualiza o modal
+        modalTotalVenda.textContent = `R$ ${totalVenda.toFixed(2)}`;
+        
         // Habilita/desabilita botão de finalizar
         btnFinalizar.disabled = carrinho.length === 0;
-
-        // Sempre que o carrinho muda, atualiza o modal de pagamentos
-        renderizarPagamentos();
     }
-
+    
     /**
-     * Atualiza a quantidade de um item já existente no carrinho
+     * Altera a quantidade de um item diretamente no carrinho (diminuir)
      */
-    window.atualizarQuantidadeItem = function(produtoId, novaQuantidade) {
-        const qtd = parseInt(novaQuantidade);
-        
-        // Encontra o item no array do carrinho
-        const item = carrinho.find(item => item.id === produtoId);
+    window.alterarQuantidadeItem = function(produtoId, delta) {
+        const item = carrinho.find(i => i.id === produtoId);
+        if (!item) return;
 
-        // Validação de estoque e quantidade
-        if (isNaN(qtd) || qtd <= 0) {
-            alert("A quantidade deve ser maior que zero.");
-            renderizarCarrinho(); 
+        const novaQtd = item.qtd + delta;
+
+        if (novaQtd <= 0) {
+            if (confirm('Deseja remover o item do carrinho?')) {
+                removerItemCarrinho(produtoId);
+            }
             return;
         }
 
-        if (item && qtd > item.estoque_atual) {
-             alert(`Estoque insuficiente. Tentativa: ${qtd}, Disponível: ${item.estoque_atual}`);
-             renderizarCarrinho();
-             return;
+        // Verifica o estoque (se houver a propriedade armazenada localmente)
+        if (delta > 0 && item.estoque_atual !== undefined && novaQtd > item.estoque_atual) {
+            alert(`Estoque insuficiente! Você só pode adicionar até ${item.estoque_atual} unidade(s) deste produto.`);
+            return;
         }
 
-
-        if (item) {
-            // Atualiza quantidade e recalcula subtotal
-            item.qtd = qtd;
-            item.subtotal = item.preco * item.qtd;
-            
-            // Atualiza a interface
-            renderizarCarrinho();
-        }
-    };
+        item.qtd = novaQtd;
+        item.subtotal = item.preco * item.qtd;
+        renderizarCarrinho();
+    }
     
     /**
      * Remove um item do carrinho
@@ -538,148 +609,127 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
-     * Limpa toda a venda (carrinho e pagamentos)
+     * Limpa toda a venda
      */
     function cancelarVenda() {
-        if (carrinho.length > 0 || pagamentos.length > 0) {
-            if (confirm('Tem certeza que deseja cancelar a venda atual?')) {
-                carrinho = [];
-                pagamentos = []; // Limpa também os pagamentos
-                renderizarCarrinho();
-                limparFormularioProduto();
-                modalFinalizarVenda.hide();
-            }
+        if (carrinho.length > 0 && confirm('Tem certeza que deseja cancelar a venda atual?')) {
+            carrinho = [];
+            orcamentoCarregadoId = null;
+            document.getElementById('badge-orcamento').classList.add('d-none');
+            renderizarCarrinho();
+            limparFormularioProduto();
         }
     }
-
-    // =========================================================================
-    // NOVO: Lógica de Múltiplos Pagamentos
-    // =========================================================================
     
-    function adicionarPagamento() {
-        const forma = selectFormaPagamentoAdd.value;
-        const valor = parseFloat(inputValorPagamentoAdd.value);
-
-        if (isNaN(valor) || valor <= 0) {
-            alert('Por favor, insira um valor válido para o pagamento.');
-            return;
+    /**
+     * Lógica do modal de finalização (FUNÇÃO ATUALIZADA COM PIX)
+     */
+    function atualizarModalPagamento() {
+        const totalVenda = parseFloat(carrinho.reduce((acc, item) => acc + item.subtotal, 0));
+        const valorPago = parseFloat(inputValorPago.value) || 0;
+        
+        let troco = 0;
+        
+        // Atualiza o valor total no modal (para ambos os lados)
+        modalTotalVenda.textContent = `R$ ${totalVenda.toFixed(2)}`; // ATUALIZADO
+        modalTotalPix.textContent = totalVenda.toFixed(2);
+        
+        // Esconde todos
+        campoValorPago.style.display = 'none';
+        campoPixQrcode.style.display = 'none';
+        camposMultiplo.style.display = 'none';
+        
+        // Verifica a forma de pagamento selecionada
+        if (selectFormaPagamento.value === 'dinheiro') {
+            campoValorPago.style.display = 'block'; // Mostra campo "Valor Pago"
+            if (valorPago > 0) {
+                 troco = valorPago - totalVenda;
+            }
+        
+        } else if (selectFormaPagamento.value === 'pix') {
+            campoPixQrcode.style.display = 'block'; // Mostra campo "QR Code"
+            inputValorPago.value = totalVenda.toFixed(2);
+            troco = 0;
+            
+        } else if (selectFormaPagamento.value === 'multiplo') {
+            camposMultiplo.style.display = 'block'; // Mostra campos múltiplos
+            const valDin = parseFloat(inputValorMultiploDinheiro.value) || 0;
+            const valCar = parseFloat(inputValorMultiploCartao.value) || 0;
+            const valPix = parseFloat(inputValorMultiploPix.value) || 0;
+            const somaMultiplo = valDin + valCar + valPix;
+            if (somaMultiplo > 0) {
+                 troco = somaMultiplo - totalVenda;
+            }
+        
+        } else {
+            // 'cartao' ou outro
+            inputValorPago.value = totalVenda.toFixed(2);
+            troco = 0;
         }
         
-        const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
-        const totalPagoAtual = pagamentos.reduce((acc, p) => acc + p.valor, 0);
+        modalTroco.textContent = `R$ ${troco.toFixed(2)}`;
         
-        // Adiciona o novo pagamento à lista
-        pagamentos.push({
-            forma_pagamento: forma,
-            valor: parseFloat(valor.toFixed(2)) // Arredonda para 2 casas
-        });
-        
-        // Limpa os inputs de pagamento
-        inputValorPagamentoAdd.value = '';
-        selectFormaPagamentoAdd.value = 'dinheiro';
-        
-        renderizarPagamentos();
-        
-        // Foca no campo de valor, sugerindo o valor restante
-        const novoTotalPago = pagamentos.reduce((acc, p) => acc + p.valor, 0);
-        const novoValorRestante = Math.max(0, totalVenda - novoTotalPago);
-        inputValorPagamentoAdd.value = novoValorRestante.toFixed(2);
-        inputValorPagamentoAdd.focus();
-        inputValorPagamentoAdd.select();
-    }
-
-    function renderizarPagamentos() {
-        pagamentosTbody.innerHTML = '';
-        let totalPago = 0;
-        let totalPix = 0;
-        
-        const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
-        const totalVendaArredondado = parseFloat(totalVenda.toFixed(2));
-
-        pagamentos.forEach((pagamento, index) => {
-            totalPago += pagamento.valor;
-            if (pagamento.forma_pagamento === 'pix') {
-                totalPix += pagamento.valor;
-            }
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${pagamento.forma_pagamento.charAt(0).toUpperCase() + pagamento.forma_pagamento.slice(1)}</td>
-                <td>R$ ${pagamento.valor.toFixed(2)}</td>
-                <td>
-                    <button class="btn btn-sm btn-danger" onclick="removerPagamento(${index})">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            `;
-            pagamentosTbody.appendChild(tr);
-        });
-        
-        const totalPagoArredondado = parseFloat(totalPago.toFixed(2));
-        let troco = totalPagoArredondado - totalVendaArredondado;
-
-        // Atualiza a seção de resumo
-        modalTotalVenda.textContent = `R$ ${totalVendaArredondado.toFixed(2)}`;
-        modalTotalPago.textContent = `R$ ${totalPagoArredondado.toFixed(2)}`;
-        modalTroco.textContent = `R$ ${Math.max(0, troco).toFixed(2)}`;
-        modalTroco.classList.remove('text-danger', 'text-primary');
-
-        // Atualiza status e botão de confirmação
-        if (totalVendaArredondado === 0) {
-            btnConfirmarVenda.disabled = true;
-            alertaStatus.className = 'alert alert-danger mt-3';
-            alertaStatus.textContent = 'Adicione itens ao carrinho para finalizar a venda.';
-        } else if (totalPagoArredondado >= totalVendaArredondado) {
-            btnConfirmarVenda.disabled = false;
-            alertaStatus.className = 'alert alert-success mt-3';
-            alertaStatus.innerHTML = `<i class="fas fa-check-circle"></i> **Pagamento Suficiente.** Troco: R$ ${Math.max(0, troco).toFixed(2)}`;
-            modalTroco.classList.add('text-primary');
-        } else {
-            btnConfirmarVenda.disabled = true;
-            alertaStatus.className = 'alert alert-warning mt-3';
-            alertaStatus.innerHTML = `<i class="fas fa-exclamation-triangle"></i> **Pagamento Insuficiente.** Faltam: R$ ${(totalVendaArredondado - totalPagoArredondado).toFixed(2)}`;
+        if (troco < 0) {
             modalTroco.classList.add('text-danger');
-        }
-        
-        // Lógica de exibição do QR Code PIX (se houver pagamento PIX)
-        if (totalPix > 0) {
-            campoPixQrcode.style.display = 'block';
-            modalTotalPix.textContent = totalPix.toFixed(2);
+            modalTroco.classList.remove('text-primary');
         } else {
-            campoPixQrcode.style.display = 'none';
+            modalTroco.classList.remove('text-danger');
+            modalTroco.classList.add('text-primary');
         }
     }
     
-    window.removerPagamento = function(index) {
-        if (confirm('Tem certeza que deseja remover este pagamento?')) {
-             pagamentos.splice(index, 1);
-             renderizarPagamentos();
-        }
-    }
-
-    // =========================================================================
-    // Lógica de Envio da Venda (Finalizar)
-    // =========================================================================
+    /**
+     * Envia os dados da venda para o backend
+     */
     async function finalizarVenda() {
         const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
-        const totalPago = pagamentos.reduce((acc, p) => acc + p.valor, 0);
+        const formaPagamento = selectFormaPagamento.value;
+        let valorPago = parseFloat(inputValorPago.value) || 0;
         
-        // Última validação de segurança
-        if (carrinho.length === 0 || totalVenda <= 0) {
-            alert('Carrinho vazio ou valor zero.');
-            return;
-        }
+        let valorDinheiro = 0;
+        let valorCartao = 0;
+        let valorPix = 0;
 
-        if (parseFloat(totalPago.toFixed(2)) < parseFloat(totalVenda.toFixed(2))) {
-            alert('Valor total pago é insuficiente para a venda.');
-            return;
+        if (formaPagamento === 'dinheiro') {
+            valorDinheiro = valorPago;
+            if (valorPago < totalVenda) {
+                alert('Valor pago é menor que o total da venda.');
+                return;
+            }
+        } else if (formaPagamento === 'cartao') {
+            valorCartao = totalVenda;
+            valorPago = totalVenda;
+        } else if (formaPagamento === 'pix') {
+            valorPix = totalVenda;
+            valorPago = totalVenda;
+        } else if (formaPagamento === 'multiplo') {
+            valorDinheiro = parseFloat(inputValorMultiploDinheiro.value) || 0;
+            valorCartao = parseFloat(inputValorMultiploCartao.value) || 0;
+            valorPix = parseFloat(inputValorMultiploPix.value) || 0;
+            valorPago = valorDinheiro + valorCartao + valorPix;
+            
+            if (valorPago < totalVenda) {
+                alert('A soma dos múltiplos valores é menor que o total da venda.');
+                return;
+            }
+            if (valorPago > totalVenda) {
+                const troco = valorPago - totalVenda;
+                if (troco > valorDinheiro) {
+                    alert('O troco não pode ser maior que o valor pago em dinheiro!');
+                    return;
+                }
+            }
         }
 
         // Prepara os dados para enviar
         const dadosVenda = {
             itens: carrinho.map(item => ({ id: item.id, quantidade: item.qtd })),
-            // NOVO: Envia a lista de pagamentos
-            pagamentos: pagamentos 
+            forma_pagamento: formaPagamento,
+            valor_pago: valorPago,
+            valor_dinheiro: valorDinheiro,
+            valor_cartao: valorCartao,
+            valor_pix: valorPix,
+            orcamento_origem_id: orcamentoCarregadoId
         };
         
         btnConfirmarVenda.disabled = true;
@@ -701,18 +751,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const result = await response.json();
             
-            // Exibe o troco, que virá na mensagem de sucesso
-            alert(result.success);
-
             // Abrir o cupom em nova janela
             window.open('/venda/cupom/' + result.venda_id, '_blank', 'width=500,height=700');
             
             // Limpa tudo
             carrinho = [];
-            pagamentos = []; // Limpa pagamentos
+            orcamentoCarregadoId = null;
+            document.getElementById('badge-orcamento').classList.add('d-none');
             renderizarCarrinho();
             limparFormularioProduto();
-            modalFinalizarVenda.hide(); 
+            modalFinalizarVenda.hide(); // CORRIGIDO
 
         } catch (error) {
             console.error('Erro ao finalizar venda:', error);
@@ -722,9 +770,145 @@ document.addEventListener('DOMContentLoaded', function() {
             btnConfirmarVenda.innerHTML = '<i class="fas fa-save"></i> Confirmar Venda';
         }
     }
-    
+
+    /**
+     * Envia os dados do carrinho para gerar um orçamento
+     */
+    async function gerarOrcamento() {
+        if (carrinho.length === 0) {
+            alert('Adicione itens ao carrinho antes de gerar um orçamento.');
+            return;
+        }
+
+        const dadosOrcamento = {
+            itens: carrinho.map(item => ({ id: item.id, quantidade: item.qtd }))
+        };
+        
+        btnOrcamento.disabled = true;
+        btnOrcamento.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+
+        try {
+            const response = await fetch('/vendas/orcamento', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(dadosOrcamento)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro desconhecido');
+            }
+
+            const result = await response.json();
+            
+            // Abrir o cupom de orçamento em nova janela
+            window.open('/venda/cupom_orcamento/' + result.orcamento_id, '_blank', 'width=500,height=700');
+            
+            // Limpa tudo
+            carrinho = [];
+            orcamentoCarregadoId = null;
+            document.getElementById('badge-orcamento').classList.add('d-none');
+            renderizarCarrinho();
+            limparFormularioProduto();
+
+        } catch (error) {
+            console.error('Erro ao gerar orçamento:', error);
+            alert(`Erro: ${error.message}`);
+        } finally {
+            btnOrcamento.disabled = false;
+            btnOrcamento.innerHTML = '<i class="fas fa-file-invoice-dollar"></i> Gerar Orçamento (F4)';
+        }
+    }
+
+    /**
+     * Busca os orçamentos pendentes do backend
+     */
+    async function buscarOrcamentosPendentes() {
+        const tbody = document.getElementById('lista-orcamentos-body');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center"><i class="fas fa-spinner fa-spin"></i> Carregando...</td></tr>';
+        
+        try {
+            const response = await fetch('/api/orcamentos_pendentes');
+            if (!response.ok) throw new Error('Erro ao buscar orçamentos');
+            
+            const orcamentos = await response.json();
+            
+            if (orcamentos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum orçamento pendente encontrado.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            orcamentos.forEach(orc => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${orc.numero}</strong></td>
+                    <td>${orc.data}</td>
+                    <td>${orc.operador}</td>
+                    <td>R$ ${orc.total.toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="carregarOrcamento(${orc.id}, '${orc.numero}')">
+                            <i class="fas fa-download"></i> Carregar
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+        } catch (error) {
+            console.error(error);
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Erro ao carregar orçamentos.</td></tr>';
+        }
+    }
+
+    /**
+     * Carrega os itens de um orçamento para o carrinho do PDV
+     */
+    window.carregarOrcamento = async function(id, numero) {
+        if (carrinho.length > 0) {
+            if (!confirm('O carrinho atual não está vazio. Deseja substituí-lo pelos itens deste orçamento?')) {
+                return;
+            }
+        }
+        
+        try {
+            const response = await fetch('/api/orcamento/' + id);
+            if (!response.ok) throw new Error('Erro ao carregar orçamento');
+            
+            const dados = await response.json();
+            
+            // Substitui o carrinho
+            carrinho = dados.itens.map(item => ({
+                id: item.id,
+                nome: item.nome,
+                preco: item.preco_venda,
+                qtd: item.quantidade,
+                subtotal: item.subtotal
+            }));
+            
+            // Define a variável global
+            orcamentoCarregadoId = dados.id;
+            
+            // Atualiza interface
+            const badge = document.getElementById('badge-orcamento');
+            badge.textContent = 'Orçamento Carregado: ' + dados.numero;
+            badge.classList.remove('d-none');
+            
+            renderizarCarrinho();
+            
+            // Esconde modal
+            bootstrap.Modal.getInstance(document.getElementById('modalBuscarOrcamento')).hide();
+            
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao carregar os itens do orçamento.');
+        }
+    };
+
     // =========================================================================
-    // Funções de Busca por Nome (mantidas)
+    //           INÍCIO DAS NOVAS FUNÇÕES (BUSCA POR NOME)
     // =========================================================================
 
     /**
@@ -783,11 +967,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Informações (Nome, Estoque)
             const infoHtml = `
-                <div class="d-flex align-items-center">
-                    <div class="info">
-                        <span class="nome">${produto.nome}</span>
-                        <span class="detalhes">Cód: ${produto.codigo_barras} | Estoque: ${produto.estoque_atual}</span>
-                    </div>
+                <div class="info">
+                    <span class="nome">${produto.nome}</span>
+                    <span class="detalhes">Cód: ${produto.codigo_barras} | Estoque: ${produto.estoque_atual}</span>
                 </div>
             `;
             
@@ -825,8 +1007,8 @@ document.addEventListener('DOMContentLoaded', function() {
         produtoAtual = {
             id: produto.id,
             nome: produto.nome,
-            preco_venda: produto.preco_venda,
-            estoque_atual: produto.estoque_atual
+            preco_venda: produto.preco_venda
+            // os outros campos não são necessários para adicionarAoCarrinho
         };
         
         // 2. Chama a função de adicionar ao carrinho
@@ -837,6 +1019,11 @@ document.addEventListener('DOMContentLoaded', function() {
         modalBusca.hide();
     }
     
+    // =========================================================================
+    //           FIM DAS NOVAS FUNÇÕES
+    // =========================================================================
+
+
     // =========================================================================
     // EVENT LISTENERS
     // =========================================================================
@@ -850,11 +1037,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Passa true para forçar a busca
             buscarProduto(true).then(() => {
                 if(produtoAtual) {
-                    // Aqui, em vez de adicionar direto, focamos no campo quantidade para ajuste.
-                    // Se o usuário pressionou enter no campo de código, ele quer o item no carrinho.
-                    if (document.activeElement.id === 'codigo_barras') {
-                        adicionarAoCarrinho();
-                    }
+                    adicionarAoCarrinho();
                 }
             });
         } else {
@@ -872,45 +1055,53 @@ document.addEventListener('DOMContentLoaded', function() {
     inputQuantidade.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            adicionarAoCarrinho(); 
+            adicionarAoCarrinho(); // CORRIGIDO (era adicionarAoVenda)
         }
     });
     
     // Botões de ação
     btnCancelar.addEventListener('click', cancelarVenda);
     btnConfirmarVenda.addEventListener('click', finalizarVenda);
-    btnAdicionarPagamento.addEventListener('click', adicionarPagamento); // NOVO LISTENER
+    if (btnOrcamento) {
+        btnOrcamento.addEventListener('click', gerarOrcamento);
+    }
     
-    // Lógica para adicionar pagamento com Enter no campo de valor do pagamento
-    inputValorPagamentoAdd.addEventListener('keydown', (e) => {
-         if (e.key === 'Enter') {
-             e.preventDefault();
-             adicionarPagamento();
-         }
-    });
+    // Listeners do Modal
+    selectFormaPagamento.addEventListener('change', atualizarModalPagamento);
+    inputValorPago.addEventListener('input', atualizarModalPagamento);
+    inputValorMultiploDinheiro.addEventListener('input', atualizarModalPagamento);
+    inputValorMultiploCartao.addEventListener('input', atualizarModalPagamento);
+    inputValorMultiploPix.addEventListener('input', atualizarModalPagamento);
     
-    // Atalhos do teclado 
+    // Atalhos do teclado (MODIFICADO)
     document.addEventListener('keydown', (e) => {
         
+        // ======================================================= //
+        //           INÍCIO DA NOVA LÓGICA (F2)                    //
+        // ======================================================= //
         if (e.key === 'F2') {
             e.preventDefault();
             modalBusca.show();
         }
+        // ======================================================= //
         
         if (e.key === 'F6') {
             e.preventDefault();
             if(carrinho.length > 0) {
-                // Ao abrir, atualizamos o modal de pagamentos e a sugestão inicial
-                const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
-                inputValorPagamentoAdd.value = totalVenda.toFixed(2);
-                selectFormaPagamentoAdd.value = 'dinheiro'; // Sugere dinheiro como padrão
-                
-                // Limpa pagamentos anteriores, para que o PDV comece "limpo" a cada F6
-                pagamentos = [];
-                
-                renderizarPagamentos();
-                modalFinalizarVenda.show(); 
+                atualizarModalPagamento(); 
+                modalFinalizarVenda.show(); // CORRIGIDO (era modal.show())
             }
+        }
+        if (btnOrcamento && e.key === 'F4') {
+            e.preventDefault();
+            if(carrinho.length > 0) {
+                gerarOrcamento();
+            }
+        }
+        if (btnOrcamento && e.key === 'F8') {
+            e.preventDefault();
+            const modalOrc = new bootstrap.Modal(document.getElementById('modalBuscarOrcamento'));
+            modalOrc.show();
         }
         if (e.key === 'F3') {
             e.preventDefault();
@@ -918,6 +1109,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // =========================================================================
+    //           INÍCIO DOS NOVOS LISTENERS (MODAL DE BUSCA)
+    // =========================================================================
+    
+    // Evento para carregar orçamentos ao abrir o modal
+    document.getElementById('modalBuscarOrcamento').addEventListener('shown.bs.modal', function () {
+        buscarOrcamentosPendentes();
+    });
+    
     // Foca o input de busca quando o modal abrir
     document.getElementById('modalBuscarProduto').addEventListener('shown.bs.modal', function () {
         inputBuscaNome.focus();
@@ -928,21 +1128,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('modalBuscarProduto').addEventListener('hidden.bs.modal', function () {
         inputBuscaNome.value = '';
         listaResultadosBusca.innerHTML = '<p class="text-center text-muted">Aguardando digitação (mín. 2 caracteres)...</p>';
-    });
-    
-    // Foco e sugestão de pagamento no modal de finalização ao abrir
-    document.getElementById('modalFinalizar').addEventListener('shown.bs.modal', function () {
-        const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
-        // Sugere o valor restante ou total da venda como primeiro pagamento
-        const totalPagoAtual = pagamentos.reduce((acc, p) => acc + p.valor, 0);
-        const valorRestante = Math.max(0, totalVenda - totalPagoAtual);
-        
-        inputValorPagamentoAdd.value = valorRestante.toFixed(2);
-        selectFormaPagamentoAdd.value = 'dinheiro'; // Sugere dinheiro como padrão
-        inputValorPagamentoAdd.focus();
-        inputValorPagamentoAdd.select();
-
-        renderizarPagamentos();
     });
 
     // Evento de digitação no input de busca (com debounce)
@@ -956,6 +1141,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         buscaTypingTimer = setTimeout(buscarProdutoPorNome, 300); // 300ms de espera
+    });
+    // =========================================================================
+    //           FIM DOS NOVOS LISTENERS
+    // =========================================================================
+
+    // Evento quando o Modal de Finalizar Venda é aberto para auto-preencher valores
+    document.getElementById('modalFinalizar').addEventListener('show.bs.modal', function () {
+        const totalVenda = parseFloat(carrinho.reduce((acc, item) => acc + item.subtotal, 0));
+        
+        // Auto-preenche os campos de pagamento com o total da compra
+        inputValorPago.value = totalVenda.toFixed(2);
+        inputValorMultiploDinheiro.value = totalVenda.toFixed(2);
+        inputValorMultiploCartao.value = '';
+        inputValorMultiploPix.value = '';
+        
+        // Garante que a interface reflita o preenchimento sem calcular troco negativo indevido
+        atualizarModalPagamento();
     });
 
     // Inicializa a tela

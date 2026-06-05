@@ -2,220 +2,307 @@
 
 {% block title %}Dashboard - Sistema de Caixa{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Estilos específicos para os cards do dashboard */
+    .stat-card-primary {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(30, 58, 138, 0.25) 100%);
+        border-left: 4px solid #3b82f6;
+    }
+    .stat-card-success {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 78, 59, 0.25) 100%);
+        border-left: 4px solid #10b981;
+    }
+    .stat-card-warning {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(120, 53, 15, 0.25) 100%);
+        border-left: 4px solid #f59e0b;
+    }
+    .stat-card-info {
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(12, 74, 110, 0.25) 100%);
+        border-left: 4px solid #0ea5e9;
+    }
+    
+    .stat-icon {
+        opacity: 0.8;
+        filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        transition: transform 0.3s ease;
+    }
+    .glass-card:hover .stat-icon {
+        transform: scale(1.15) rotate(5deg);
+    }
+
+    .list-group-glass .list-group-item {
+        background: transparent;
+        border-color: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary);
+    }
+    .list-group-glass .list-group-item-info {
+        background: rgba(59, 130, 246, 0.15);
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    /* Badges Customizadas */
+    .badge-glass-success {
+        background: rgba(16, 185, 129, 0.2);
+        color: #6ee7b7;
+        border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .badge-glass-danger {
+        background: rgba(239, 68, 68, 0.2);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+    .badge-glass-warning {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fde68a;
+        border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+    .badge-glass-secondary {
+        background: rgba(148, 163, 184, 0.2);
+        color: #cbd5e1;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-<h1 class="h2"><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
-<div class="btn-toolbar mb-2 mb-md-0">
-<span class="badge {% if caixa_aberto %}bg-success{% else %}bg-danger{% endif %} fs-6">
-<i class="fas {% if caixa_aberto %}fa-lock-open{% else %}fa-lock{% endif %}"></i>
-Caixa {% if caixa_aberto %}Aberto{% else %}Fechado{% endif %}
-</span>
-</div>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-3 mb-4 border-bottom border-secondary border-opacity-25">
+    <h1 class="h2 text-white fw-bold"><i class="fas fa-tachometer-alt text-primary me-2"></i> Dashboard</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <span class="badge {% if caixa_aberto %}badge-glass-success{% else %}badge-glass-danger{% endif %} fs-6 px-3 py-2 rounded-pill shadow-sm">
+            <i class="fas {% if caixa_aberto %}fa-lock-open{% else %}fa-lock{% endif %} me-1"></i>
+            Caixa {% if caixa_aberto %}Aberto{% else %}Fechado{% endif %}
+        </span>
+    </div>
 </div>
 
 <div class="row mb-4">
-<div class="col-md-3 mb-3">
-<div class="card stats-card bg-primary text-white">
-<div class="card-body">
-<div class="d-flex justify-content-between">
-<div>
-<h5 class="card-title">Vendas Hoje</h5>
-<h2 class="card-text">R$ {{ "%.2f"|format(total_hoje) }}</h2>
-</div>
-<div class="align-self-center">
-<i class="fas fa-shopping-cart fa-2x"></i>
-</div>
-</div>
-</div>
-</div>
-</div>
-
-<div class="col-md-3 mb-3">
-    <div class="card stats-card bg-success text-white">
-        <div class="card-body">
-            <div class="d-flex justify-content-between">
+    <!-- Vendas Hoje -->
+    <div class="col-md-3 mb-3">
+        <div class="glass-card stat-card-primary h-100">
+            <div class="glass-card-body d-flex justify-content-between align-items-center">
                 <div>
-                    <h5 class="card-title">Produtos</h5>
-                    <h2 class="card-text">{{ total_produtos }}</h2>
+                    <h6 class="text-uppercase text-secondary fw-bold mb-1" style="letter-spacing: 0.5px;">Vendas Hoje</h6>
+                    <h2 class="mb-0 text-white fw-bold">R$ {{ "%.2f"|format(total_hoje) }}</h2>
                 </div>
-                <div class="align-self-center">
-                    <i class="fas fa-boxes fa-2x"></i>
+                <div class="stat-icon text-primary">
+                    <i class="fas fa-shopping-cart fa-3x"></i>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="col-md-3 mb-3">
-    <div class="card stats-card bg-warning text-dark">
-        <div class="card-body">
-            <div class="d-flex justify-content-between">
+    <!-- Produtos -->
+    <div class="col-md-3 mb-3">
+        <div class="glass-card stat-card-success h-100">
+            <div class="glass-card-body d-flex justify-content-between align-items-center">
                 <div>
-                    <h5 class="card-title">Estoque Baixo</h5>
-                    <h2 class="card-text">{{ estoque_baixo }}</h2>
+                    <h6 class="text-uppercase text-secondary fw-bold mb-1" style="letter-spacing: 0.5px;">Produtos</h6>
+                    <h2 class="mb-0 text-white fw-bold">{{ total_produtos }}</h2>
                 </div>
-                <div class="align-self-center">
-                    <i class="fas fa-exclamation-triangle fa-2x"></i>
+                <div class="stat-icon text-success">
+                    <i class="fas fa-boxes fa-3x"></i>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="col-md-3 mb-3">
-    <div class="card stats-card bg-info text-white">
-        <div class="card-body">
-            <div class="d-flex justify-content-between">
+    <!-- Estoque Baixo -->
+    <div class="col-md-3 mb-3">
+        <div class="glass-card stat-card-warning h-100">
+            <div class="glass-card-body d-flex justify-content-between align-items-center">
                 <div>
-                    <h5 class="card-title">Status Caixa</h5>
-                    <h6 class="card-text">
+                    <h6 class="text-uppercase text-secondary fw-bold mb-1" style="letter-spacing: 0.5px;">Estoque Baixo</h6>
+                    <h2 class="mb-0 text-white fw-bold">{{ estoque_baixo }}</h2>
+                </div>
+                <div class="stat-icon text-warning">
+                    <i class="fas fa-exclamation-triangle fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Caixa -->
+    <div class="col-md-3 mb-3">
+        <div class="glass-card stat-card-info h-100">
+            <div class="glass-card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-uppercase text-secondary fw-bold mb-1" style="letter-spacing: 0.5px;">Status do Caixa</h6>
+                    <h4 class="mb-0 mt-2">
                         {% if caixa_aberto %}
-                            <span class="badge bg-success">Aberto</span>
+                            <span class="badge badge-glass-success py-2">Aberto</span>
                         {% else %}
-                            <span class="badge bg-danger">Fechado</span>
+                            <span class="badge badge-glass-danger py-2">Fechado</span>
                         {% endif %}
-                    </h6>
+                    </h4>
                 </div>
-                <div class="align-self-center">
-                    <i class="fas fa-cash-register fa-2x"></i>
+                <div class="stat-icon text-info">
+                    <i class="fas fa-cash-register fa-3x"></i>
                 </div>
             </div>
         </div>
     </div>
-</div>
-
-
 </div>
 
 {% if caixas_esquecidos %}
-
-<div class="row">
-<div class="col-md-12">
-<div class="alert alert-danger">
-<h5 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Atenção: Caixas Não Fechados!</h5>
-<p>Os seguintes caixas foram abertos em dias anteriores e não foram fechados:</p>
-<ul class="mb-0">
-{% for caixa in caixas_esquecidos %}
-<li>
-<strong>Operador:</strong> {{ caixa.usuario.nome }} 
-<strong>Aberto desde:</strong> {{ caixa.data_abertura.strftime('%d/%m/%Y %H:%M') }} 
-<strong>Saldo Inicial:</strong> R$ {{ "%.2f"|format(caixa.saldo_inicial) }}
-</li>
-{% endfor %}
-</ul>
-</div>
-</div>
-</div>
-{% endif %}
-<div class="row">
-<div class="col-md-6">
-<div class="card">
-<div class="card-header">
-<h5><i class="fas fa-rocket"></i> Ações Rápidas</h5>
-</div>
-<div class="card-body">
-<div class="d-grid gap-2">
-{% if caixa_aberto %}
-<a href="{{ url_for('vendas') }}" class="btn btn-success btn-lg">
-<i class="fas fa-cash-register"></i> Nova Venda
-</a>
-<a href="{{ url_for('fechar_caixa') }}" class="btn btn-warning">
-<i class="fas fa-lock"></i> Fechar Caixa
-</a>
-{% else %}
-<a href="{{ url_for('abrir_caixa') }}" class="btn btn-primary btn-lg">
-<i class="fas fa-lock-open"></i> Abrir Caixa
-</a>
-{% endif %}
-
-                {% if current_user.is_admin() %}
-                <a href="{{ url_for('produtos') }}" class="btn btn-outline-primary">
-                    <i class="fas fa-boxes"></i> Gerenciar Produtos
-                </a>
-                <a href="{{ url_for('relatorios') }}" class="btn btn-outline-info">
-                    <i class="fas fa-chart-bar"></i> Ver Relatórios
-                </a>
-                
-                <!-- BOTÃO DE BACKUP ADICIONADO DE VOLTA -->
-                <a href="{{ url_for('backup_database') }}" class="btn btn-outline-danger" 
-                   onclick="return confirm('Isso fará o download de um backup completo do banco de dados. Deseja continuar?');">
-                    <i class="fas fa-database"></i> Backup do Banco de Dados
-                </a>
-                {% endif %}
-            </div>
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="alert alert-glass alert-danger">
+            <h5 class="alert-heading fw-bold mb-3"><i class="fas fa-exclamation-triangle me-2"></i> Atenção: Caixas Não Fechados!</h5>
+            <p class="mb-2">Os seguintes caixas foram abertos em dias anteriores e não foram fechados:</p>
+            <ul class="mb-0">
+            {% for caixa in caixas_esquecidos %}
+                <li class="mb-1">
+                    <strong>Operador:</strong> {{ caixa.usuario.nome }} |
+                    <strong>Aberto desde:</strong> <span class="text-white">{{ caixa.data_abertura.strftime('%d/%m/%Y %H:%M') }}</span> |
+                    <strong>Saldo Inicial:</strong> R$ {{ "%.2f"|format(caixa.saldo_inicial) }}
+                </li>
+            {% endfor %}
+            </ul>
         </div>
     </div>
 </div>
+{% endif %}
 
-<div class="col-md-6">
-    <div class="card">
-        <div class="card-header">
-            <h5><i class="fas fa-users-cog"></i> Status dos Operadores</h5>
+<div class="row">
+    <!-- Ações Rápidas -->
+    <div class="col-md-6 mb-4">
+        <div class="glass-card h-100">
+            <div class="glass-card-header d-flex align-items-center">
+                <i class="fas fa-rocket text-primary me-2"></i> Ações Rápidas
+            </div>
+            <div class="glass-card-body">
+                <div class="d-grid gap-3">
+                    {% if caixa_aberto %}
+                    <a href="{{ url_for('vendas') }}" class="btn btn-glass-success btn-lg py-3 fw-bold">
+                        <i class="fas fa-cash-register me-2"></i> Ir para Frente de Caixa (Nova Venda)
+                    </a>
+                    <a href="{{ url_for('fechar_caixa') }}" class="btn btn-glass" style="color: #fca5a5; border-color: rgba(239, 68, 68, 0.4);">
+                        <i class="fas fa-lock me-2"></i> Fechar Caixa
+                    </a>
+                    {% else %}
+                    <a href="{{ url_for('abrir_caixa') }}" class="btn btn-glass-primary btn-lg py-3 fw-bold">
+                        <i class="fas fa-lock-open me-2"></i> Abrir Caixa
+                    </a>
+                    {% endif %}
+
+                    {% if current_user.is_admin() %}
+                    <div class="row mt-2 g-2">
+                        <div class="col-6">
+                            <a href="{{ url_for('produtos') }}" class="btn btn-glass w-100">
+                                <i class="fas fa-boxes me-2 text-info"></i> Gerenciar Produtos
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('relatorios') }}" class="btn btn-glass w-100">
+                                <i class="fas fa-chart-bar me-2 text-warning"></i> Ver Relatórios
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <hr class="border-secondary opacity-25 my-4">
+                    
+                    <h6 class="text-secondary fw-bold mb-3"><i class="fas fa-cogs me-2"></i> Módulos do Sistema</h6>
+                    <a href="{{ url_for('toggle_orcamento') }}" class="btn btn-glass d-flex justify-content-between align-items-center {% if orcamento_ativo %}border-success{% else %}border-secondary{% endif %}">
+                        <span><i class="fas fa-file-invoice-dollar me-2"></i> Orçamentos</span>
+                        {% if orcamento_ativo %}
+                            <span class="badge badge-glass-success">ATIVADO</span>
+                        {% else %}
+                            <span class="badge badge-glass-secondary">DESATIVADO</span>
+                        {% endif %}
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <p><strong>Admin Logado:</strong> {{ current_user.nome }}</p> <p><strong>Data/Hora:</strong> {{ now.strftime('%d/%m/%Y %H:%M') }}</p>
-            <hr>
-            <h6><i class="fas fa-cash-register"></i> Monitoramento de Caixas</h6> 
-            <ul class="list-group">
-                {% for op_status in status_caixas %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center {% if op_status.nome == current_user.nome %}list-group-item-info{% endif %}">
-                        <span>
-                            <i class="fas fa-user"></i> 
-                            <strong>{{ op_status.nome }}</strong>
-                            {% if op_status.nome == current_user.nome %} (Você){% endif %}
-                            
-                            {% if op_status.status == 'aberto' %}
-                                <br><span class="text-muted">Aberto em: {{ op_status.data.strftime('%d/%m %H:%M') }}</span>
-                            {% elif op_status.status == 'fechado' %}
-                                <br><span class="text-muted">Fechado em: {{ op_status.data.strftime('%d/%m %H:%M') }}</span>
-                            {% endif %}
-                            </span>
-                        
+    </div>
+
+    <!-- Status dos Operadores -->
+    <div class="col-md-6 mb-4">
+        <div class="glass-card h-100">
+            <div class="glass-card-header d-flex align-items-center">
+                <i class="fas fa-users-cog text-info me-2"></i> Monitoramento de Operadores
+            </div>
+            <div class="glass-card-body p-0">
+                <div class="p-3 border-bottom border-secondary border-opacity-25" style="background: rgba(0,0,0,0.1);">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small class="text-secondary d-block">Admin Logado</small>
+                            <span class="fw-bold">{{ current_user.nome }}</span>
+                        </div>
                         <div class="text-end">
-                            {% if op_status.status == 'aberto' %}
-                                <span class="badge bg-success"><i class="fas fa-lock-open"></i> Aberto</span>
-                            
-                            {% elif op_status.status == 'fechado' %}
-                                <span class="badge bg-danger"><i class="fas fa-lock"></i> Fechado</span>
+                            <small class="text-secondary d-block">Data/Hora</small>
+                            <span class="fw-bold">{{ now.strftime('%d/%m/%Y %H:%M') }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <ul class="list-group list-group-flush list-group-glass">
+                    {% for op_status in status_caixas %}
+                        <li class="list-group-item p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center align-items-start {% if op_status.nome == current_user.nome %}list-group-item-info{% endif %}">
+                            <div class="mb-2 mb-md-0">
+                                <i class="fas fa-user text-secondary me-2"></i> 
+                                <strong class="fs-6">{{ op_status.nome }}</strong>
+                                {% if op_status.nome == current_user.nome %} 
+                                    <span class="badge bg-primary ms-1" style="font-size: 0.6rem;">Você</span>
+                                {% endif %}
                                 
-                                {# A lógica agora usa o sinalizador 'mostrar_diferenca' vindo do app.py #}
-                                {% if op_status.mostrar_diferenca %}
-                                    <br>
-                                    
-                                    {# Define a cor com base na diferença #}
-                                    {% if op_status.diferenca < 0 %}
-                                        {% set cor_badge = 'bg-danger' %} {# Falta = Vermelho #}
+                                <div class="mt-1 small" style="color: var(--text-secondary);">
+                                    {% if op_status.status == 'aberto' %}
+                                        Aberto em: {{ op_status.data.strftime('%d/%m %H:%M') }}
+                                    {% elif op_status.status == 'fechado' %}
+                                        Fechado em: {{ op_status.data.strftime('%d/%m %H:%M') }}
                                     {% else %}
-                                        {% set cor_badge = 'bg-warning text-dark' %} {# Sobra = Amarelo #}
+                                        Sem registro recente
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="text-start text-md-end mt-2 mt-md-0">
+                                {% if op_status.status == 'aberto' %}
+                                    <span class="badge badge-glass-success py-2 px-3"><i class="fas fa-lock-open me-1"></i> Aberto</span>
+                                
+                                {% elif op_status.status == 'fechado' %}
+                                    <span class="badge badge-glass-danger py-2 px-3 mb-2 d-inline-block"><i class="fas fa-lock me-1"></i> Fechado</span>
+                                    
+                                    {% if op_status.mostrar_diferenca %}
+                                        <div class="p-2 rounded mt-1" style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem;">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span class="text-secondary">Esperado:</span>
+                                                <span>R$ {{ "%.2f"|format(op_status.saldo_esperado) }}</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span class="text-secondary">Informado:</span>
+                                                <span>R$ {{ "%.2f"|format(op_status.saldo_informado) }}</span>
+                                            </div>
+                                            
+                                            {% if op_status.diferenca < 0 %}
+                                                <div class="text-danger fw-bold d-flex justify-content-between align-items-center pt-1 border-top border-danger border-opacity-25">
+                                                    <span><i class="fas fa-arrow-down me-1"></i> FALTA:</span>
+                                                    <span>R$ {{ "%.2f"|format(op_status.diferenca|abs) }}</span>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-warning fw-bold d-flex justify-content-between align-items-center pt-1 border-top border-warning border-opacity-25">
+                                                    <span><i class="fas fa-arrow-up me-1"></i> SOBRA:</span>
+                                                    <span>R$ +{{ "%.2f"|format(op_status.diferenca) }}</span>
+                                                </div>
+                                            {% endif %}
+                                        </div>
                                     {% endif %}
                                     
-                                    <div class="badge {{ cor_badge }} text-start mt-1" style="font-size: 0.8rem; line-height: 1.3; white-space: normal;">
-                                        <i class="fas fa-exclamation-triangle"></i>
-                                        
-                                        <span>Total Esperado: R$ {{ "%.2f"|format(op_status.saldo_esperado) }}</span><br>
-                                        <span>Total Informado: R$ {{ "%.2f"|format(op_status.saldo_informado) }}</span><br>
-                                        
-                                        {% if op_status.diferenca < 0 %}
-                                            <span style="font-weight: bold;">FALTA: R$ {{ "%.2f"|format(op_status.diferenca|abs) }}</span>
-                                        {% else %}
-                                            <span style="font-weight: bold;">SOBRA: R$ +{{ "%.2f"|format(op_status.diferenca) }}</span>
-                                        {% endif %}
-                                        </div>
-                                {% endif %}
                                 {% else %}
-                                <span class="badge bg-secondary">Inativo</span>
-                            {% endif %}
-                        </div>
-                    </li>
-                {% else %}
-                    <li class="list-group-item">Nenhum operador de caixa encontrado.</li>
-                {% endfor %}
-            </ul>
+                                    <span class="badge badge-glass-secondary py-2 px-3">Inativo</span>
+                                {% endif %}
+                            </div>
+                        </li>
+                    {% else %}
+                        <li class="list-group-item p-3 text-center text-secondary">Nenhum operador de caixa encontrado.</li>
+                    {% endfor %}
+                </ul>
             </div>
+        </div>
     </div>
 </div>
 
-
-</div>
 {% endblock %}
