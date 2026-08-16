@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Importar Produtos - Sistema de Caixa{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h4><i class="fas fa-file-excel"></i> Importar Produtos por Excel (.xlsx)</h4>
+            </div>
+            <div class="card-body">
+                
+                <div class="alert alert-light">
+                    <h5 class="alert-heading">Instruções:</h5>
+                    <p>Prepare sua planilha Excel (`.xlsx`) com os produtos a serem importados. O ID será gerado automaticamente pelo sistema.</p>
+                    <p>A primeira linha (cabeçalho) da planilha <strong>deve conter exatamente</strong> os seguintes nomes de coluna:</p>
+                    
+                    <h6>Colunas Obrigatórias:</h6>
+                    <ul>
+                        <li><code>codigo_barras</code> (Texto ou Número)</li>
+                        <li><code>nome</code> (Texto)</li>
+                        <li><code>preco_venda</code> (Número, ex: 10.50)</li>
+                        <li><code>preco_custo</code> (Número, ex: 5.25)</li>
+                    </ul>
+
+                    <h6>Colunas Opcionais (recomendadas):</h6>
+                    <ul>
+                        <li><code>estoque_atual</code> (Número, padrão: 0)</li>
+                        <li><code>estoque_minimo</code> (Número, padrão: 0)</li>
+                        <li><code>descricao</code> (Texto)</li>
+                        <li><code>categoria</code> (Texto)</li>
+                    </ul>
+                    <hr>
+                    <p class="mb-0"><strong>Atenção:</strong> Produtos com <code>codigo_barras</code> que já existem no sistema serão ignorados.</p>
+                </div>
+
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="arquivo_excel" class="form-label">Selecione o arquivo .xlsx:</label>
+                        <input type="file" class="form-control" id="arquivo_excel" name="arquivo_excel" 
+                               accept=".xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('produtos') }}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-info">
+                            <i class="fas fa-upload"></i> Enviar e Importar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

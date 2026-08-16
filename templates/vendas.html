@@ -744,6 +744,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify(dadosVenda)
             });
 
+            const contentType = response.headers.get("content-type");
+            if (!contentType || contentType.indexOf("application/json") === -1) {
+                throw new Error("Sessão expirada. Recarregue a página e faça login novamente.");
+            }
+
             if (!response.ok) {
                 const error = await response.json();
                 throw new Error(error.error || 'Erro desconhecido');
@@ -795,6 +800,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify(dadosOrcamento)
             });
+
+            const contentType = response.headers.get("content-type");
+            if (!contentType || contentType.indexOf("application/json") === -1) {
+                throw new Error("Sessão expirada. Recarregue a página e faça login novamente.");
+            }
 
             if (!response.ok) {
                 const error = await response.json();

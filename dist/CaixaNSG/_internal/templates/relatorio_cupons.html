@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Relatório de Cupons/Vendas - Sistema de Caixa{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-receipt"></i> Relatório de Cupons/Vendas</h1>
+    <h5 class="mb-0 text-muted">
+        Vendas Finalizadas ({{ data_inicio }} a {{ data_fim }} | Filtro: {{ nome_filtro }})
+    </h5>
+</div>
+
+<form method="GET" class="mb-4" action="{{ url_for('relatorio_cupons') }}">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label for="data_inicio" class="form-label">Data Início:</label>
+            <input type="date" class="form-control" id="data_inicio" name="inicio" value="{{ data_inicio }}">
+        </div>
+        <div class="col-md-3">
+            <label for="data_fim" class="form-label">Data Fim:</label>
+            <input type="date" class="form-control" id="data_fim" name="fim" value="{{ data_fim }}">
+        </div>
+        <div class="col-md-3">
+            <label for="caixa_id" class="form-label">Caixa (Operador):</label>
+            <select class="form-select" id="caixa_id" name="caixa_id">
+                <option value="0" {% if caixa_selecionado == 0 %}selected{% endif %}>Todos os Caixas</option>
+                {% for caixa in caixas %}
+                <option value="{{ caixa.id }}" {% if caixa.id == caixa_selecionado %}selected{% endif %}>{{ caixa.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="forma_pgto" class="form-label">Forma de Pagamento (Filtro):</label>
+            <select class="form-select" id="forma_pgto" name="forma_pgto">
+                <option value="todos" {% if forma_pgto_selecionada == 'todos' %}selected{% endif %}>Todas as Formas</option>
+                <option value="dinheiro" {% if forma_pgto_selecionada == 'dinheiro' %}selected{% endif %}>Dinheiro</option>
+                <option value="cartao" {% if forma_pgto_selecionada == 'cartao' %}selected{% endif %}>Cartão</option>
+                <option value="pix" {% if forma_pgto_selecionada == 'pix' %}selected{% endif %}>PIX</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="numero_venda_busca" class="form-label">Buscar Cupom Nº:</label>
+            <input type="text" class="form-control" id="numero_venda_busca" name="numero_venda_busca" value="{{ numero_venda_busca }}" placeholder="Ex: 1001">
+        </div>
+        <div class="col-md-9 d-flex justify-content-end gap-2">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-filter"></i> Aplicar Filtro
+            </button>
+            <a href="{{ url_for('relatorio_cupons') }}" class="btn btn-secondary">
+                <i class="fas fa-eraser"></i> Limpar Filtros
+            </a>
+            <a href="{{ url_for('relatorios') }}" class="btn btn-warning">
+                <i class="fas fa-chart-line"></i> Resumo
+            </a>
+        </div>
+    </div>
+</form>
+
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-uppercase mb-0">Total das Vendas Listadas</h6>
+                        <h4 class="mb-0">R$ {{ "%.2f"|format(total_geral_cupons) }}</h4>
+                    </div>
+                    <i class="fas fa-dollar-sign fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover table-sm">
+        <thead class="table-dark">
+            <tr>
+                <th>Nº Venda</th>
+                <th>Data/Hora</th>
+                <th>Operador</th>
+                <th>Itens</th>
+                <th>Valor Total</th>
+                <th>Valor Pago</th>
+                <th>Troco</th>
+                <th>Forma(s) Pgto</th>
+                <th>Status</th>
+                <th class="text-center">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for venda in vendas_lista %}
+            <tr>
+                <td><a href="{{ url_for('cupom_venda', venda_id=venda.id) }}" target="_blank" class="fw-bold text-decoration-none">{{ venda.numero_venda }}</a></td>
+                <td>{{ venda.data_venda.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>{{ venda.operador.nome }}</td>
+                <td>{{ venda.itens | length }}</td>
+                <td class="text-nowrap">R$ {{ "%.2f"|format(venda.valor_total) }}</td>
+                <td class="text-nowrap">R$ {{ "%.2f"|format(venda.valor_pago) }}</td>
+                <td class="text-nowrap">R$ {{ "%.2f"|format(venda.troco) }}</td>
+                <td>{{ venda.formas_pagamento_usadas }}</td>
+                <td>
+                    {% if venda.status == 'cancelada' %}
+                    <span class="badge bg-danger">Cancelada</span>
+                    {% else %}
+                    <span class="badge bg-success">Finalizada</span>
+                    {% endif %}
+                </td>
+                <td class="text-center text-nowrap">
+                    {% if venda.status != 'cancelada' %}
+                        {% if venda.pagamentos | length == 1 %}
+                            <button type="button" class="btn btn-sm btn-info text-white me-1" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalEditarPagamento"
+                                    data-venda-id="{{ venda.id }}"
+                                    data-forma-atual="{{ venda.pagamentos[0].forma_pagamento }}"
+                                    data-valor-venda="{{ '%.2f'|format(venda.valor_total) }}"
+                                    data-venda-numero="{{ venda.numero_venda }}">
+                                <i class="fas fa-edit"></i> Pgto
+                            </button>
+                        {% else %}
+                            <span class="btn btn-sm btn-info text-white me-1 disabled" title="Apenas vendas com 1 forma de pagamento podem ser editadas diretamente">
+                                <i class="fas fa-edit"></i> Pgto
+                            </span>
+                        {% endif %}
+
+                        <form action="{{ url_for('vendas_cancelar', venda_id=venda.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja CANCELAR a Venda #{{ venda.numero_venda }}? Isso irá reverter o estoque e não pode ser desfeito!');" class="d-inline">
+                            <input type="hidden" name="next_url" value="{{ request.full_path }}">
+                            <button type="submit" class="btn btn-sm btn-danger" title="Cancelar Venda e Reverter Estoque">
+                                <i class="fas fa-undo"></i> Cancelar
+                            </button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if not vendas_lista %}
+<div class="alert alert-warning text-center mt-3">
+    Nenhuma venda finalizada encontrada para os filtros aplicados.
+</div>
+{% endif %}
+
+
+<div class="modal fade" id="modalEditarPagamento" tabindex="-1" aria-labelledby="modalEditarPagamentoLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="modalEditarPagamentoLabel">
+                    <i class="fas fa-edit"></i> Editar Forma de Pagamento (Cupom #<span id="modal-venda-numero"></span>)
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" id="form-editar-pagamento" action="{{ url_for('editar_pagamento', venda_id=0) }}">
+                <div class="modal-body">
+                    <p class="text-danger fw-bold">Atenção: Esta ação deve ser utilizada apenas para corrigir erros de lançamento. Apenas a forma de pagamento é alterada. Se o valor estiver errado, cancele e refaça a venda.</p>
+                    
+                    <div class="mb-3">
+                        <label for="forma_pagamento_edit" class="form-label">Forma de Pagamento Atual:</label>
+                        <p class="form-control-static fw-bold" id="forma-atual"></p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="valor_venda_edit" class="form-label">Valor Total da Venda:</label>
+                        <p class="form-control-static fw-bold text-success" id="valor-total-venda"></p>
+                    </div>
+
+                    <hr>
+                    
+                    <div class="mb-3">
+                        <label for="nova_forma_pagamento" class="form-label fw-bold">Selecione a Nova Forma de Pagamento:</label>
+                        <select class="form-select" id="nova_forma_pagamento" name="nova_forma_pagamento" required>
+                            <option value="">Selecione...</option>
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="cartao">Cartão</option>
+                            <option value="pix">PIX</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <input type="hidden" name="next_url" value="{{ request.full_path }}">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-info text-white">Confirmar Edição</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        const modalEditarPagamento = document.getElementById('modalEditarPagamento');
+        const formEditarPagamento = document.getElementById('form-editar-pagamento');
+        
+        // Captura a URL base com o placeholder '0' que o Jinja renderizou (ex: '/vendas/editar_pagamento/0')
+        const baseUrlWithPlaceholder = formEditarPagamento.action; 
+
+        modalEditarPagamento.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget; 
+            
+            // Extrai as informações dos atributos data-* do botão
+            const vendaId = button.getAttribute('data-venda-id');
+            const formaAtual = button.getAttribute('data-forma-atual');
+            const valorTotalVenda = button.getAttribute('data-valor-venda');
+            const vendaNumero = button.getAttribute('data-venda-numero');
+            
+            // 1. Define o action do formulário dinamicamente, substituindo o placeholder '0' pelo ID da venda
+            // Se o ID for inválido (nulo ou '0'), a submissão será barrada no servidor,
+            // mas o log indicou que o problema é a submissão com ID 0.
+            const newAction = baseUrlWithPlaceholder.replace('/0', '/' + vendaId);
+            formEditarPagamento.action = newAction;
+
+            // 2. Preenche campos de informação estática no modal
+            document.getElementById('modal-venda-numero').textContent = vendaNumero;
+            // Mostra a forma atual com a primeira letra maiúscula
+            document.getElementById('forma-atual').textContent = formaAtual.charAt(0).toUpperCase() + formaAtual.slice(1); 
+            // Substitui o ponto por vírgula para formatação visual (se o valor do data-atributo for string)
+            document.getElementById('valor-total-venda').textContent = `R$ ${valorTotalVenda.replace('.', ',')}`;
+            
+            // 3. Define a nova forma de pagamento para a forma atual como padrão no dropdown
+            document.getElementById('nova_forma_pagamento').value = formaAtual; 
+        });
+        
+        // Adiciona um listener para a submissão do formulário para garantir que o ID não é zero no cliente
+        formEditarPagamento.addEventListener('submit', function(e) {
+             // Se o action ainda for a URL com '/0', impede a submissão e alerta o usuário
+             if (formEditarPagamento.action.endsWith('/0')) {
+                 e.preventDefault();
+                 alert('Erro: Não foi possível carregar o ID da venda. Tente novamente ou recarregue a página.');
+             }
+        });
+    });
+</script>
+{% endblock %}

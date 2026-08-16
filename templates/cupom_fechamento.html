@@ -117,8 +117,11 @@
             <div class="cupom-info text-start">
                 <div><strong>Operador:</strong> {{ caixa.usuario.nome }}</div>
                 <div><strong>Abertura:</strong> {{ caixa.data_abertura.strftime('%d/%m/%Y %H:%M') }}</div>
+                {% if caixa.status == 'fechado' %}
+                <div><strong>Fechamento:</strong> {{ caixa.data_fechamento.strftime('%d/%m/%Y %H:%M') }}</div>
+                {% endif %}
                 <div><strong>Emissão:</strong> {{ now.strftime('%d/%m/%Y %H:%M') }}</div>
-                </div>
+            </div>
         </div>
 
         <div class="cupom-body">
@@ -174,6 +177,17 @@
                 <span>= ESPERADO (Dinheiro)</span>
                 <span>R$ {{ "%.2f"|format(saldo_esperado_dinheiro) }}</span>
             </div>
+            {% if caixa.status == 'fechado' %}
+            <div class="d-flex justify-content-between">
+                <span>SALDO INFORMADO</span>
+                <span>R$ {{ "%.2f"|format(caixa.saldo_final) }}</span>
+            </div>
+            {% set diferenca = caixa.saldo_final - saldo_esperado_dinheiro %}
+            <div class="d-flex justify-content-between fw-bold {% if diferenca < 0 %}text-danger{% elif diferenca > 0 %}text-success{% endif %}">
+                <span>DIFERENÇA</span>
+                <span>R$ {{ "%.2f"|format(diferenca) }}</span>
+            </div>
+            {% endif %}
         </div>
         
         <div class="cupom-footer">

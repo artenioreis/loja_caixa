@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Recebimentos Consolidados - Sistema de Caixa{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-dollar-sign"></i> Recebimentos Consolidados por Caixa</h1>
+</div>
+
+<form method="GET" class="mb-4" action="{{ url_for('relatorio_recebimentos_consolidados') }}">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label for="data_inicio" class="form-label">Data Início:</label>
+            <input type="date" class="form-control" id="data_inicio" name="inicio" value="{{ data_inicio }}">
+        </div>
+        <div class="col-md-3">
+            <label for="data_fim" class="form-label">Data Fim:</label>
+            <input type="date" class="form-control" id="data_fim" name="fim" value="{{ data_fim }}">
+        </div>
+        <div class="col-md-4">
+            <label for="caixa_id" class="form-label">Caixa (Operador):</label>
+            <select class="form-select" id="caixa_id" name="caixa_id">
+                <option value="0" {% if caixa_selecionado == 0 %}selected{% endif %}>Todos os Caixas</option>
+                {% for caixa in caixas %}
+                <option value="{{ caixa.id }}" {% if caixa.id == caixa_selecionado %}selected{% endif %}>{{ caixa.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-filter"></i> Aplicar Filtro
+            </button>
+        </div>
+    </div>
+</form>
+
+<!-- Resumo Global do Período -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-dark">
+            <div class="card-body">
+                <h6 class="text-uppercase mb-0"><i class="fas fa-globe"></i> Total Geral</h6>
+                <h4 class="mb-0">R$ {{ "%.2f"|format(totais_gerais.total_global) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h6 class="text-uppercase mb-0"><i class="fas fa-money-bill-wave"></i> Dinheiro</h6>
+                <h4 class="mb-0">R$ {{ "%.2f"|format(totais_gerais.total_dinheiro) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h6 class="text-uppercase mb-0"><i class="fas fa-credit-card"></i> Cartão</h6>
+                <h4 class="mb-0">R$ {{ "%.2f"|format(totais_gerais.total_cartao) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h6 class="text-uppercase mb-0"><i class="fas fa-qrcode"></i> PIX</h6>
+                <h4 class="mb-0">R$ {{ "%.2f"|format(totais_gerais.total_pix) }}</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h4 class="mt-4 border-bottom pb-2">Detalhamento por Operador ({{ data_inicio }} a {{ data_fim }})</h4>
+
+{% if dados_relatorio %}
+<div class="table-responsive">
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>Operador (Caixa)</th>
+                <th class="text-end">Dinheiro (R$)</th>
+                <th class="text-end">Cartão (R$)</th>
+                <th class="text-end">PIX (R$)</th>
+                <th class="text-end">Outras Formas (R$)</th>
+                <th class="text-end">TOTAL OPERADOR (R$)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for operador, dados in dados_relatorio.items() %}
+            <tr>
+                <td class="fw-bold">{{ operador }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(dados.total_dinheiro) }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(dados.total_cartao) }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(dados.total_pix) }}</td>
+                <td class="text-end">
+                    R$ {{ "%.2f"|format(dados.outros) }}
+                    {% if dados.detalhes %}
+                        <small class="text-muted d-block mt-1">
+                            <!-- Exibe detalhes das outras formas ao passar o mouse -->
+                            <span title="{% for det in dados.detalhes %}{{ det.forma }}: R$ {{ '%.2f'|format(det.valor) }}\n{% endfor %}">
+                                (Detalhes<i class="fas fa-circle-info ms-1"></i>)
+                            </span>
+                        </small>
+                    {% endif %}
+                </td>
+                <td class="text-end bg-light fw-bold">R$ {{ "%.2f"|format(dados.total_operador) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-warning mt-4">
+    **Nota sobre a Conferência de Caixa:** O valor de **Dinheiro (R$)** é o montante a ser somado ao **Saldo Inicial** do operador para a conferência física no momento do fechamento do caixa.
+</div>
+
+{% else %}
+<div class="alert alert-warning">
+    Nenhum recebimento encontrado para o período e filtro selecionados.
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Usuários - Sistema de Caixa{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom border-secondary border-opacity-25">
+    <h1 class="h2 text-white fw-bold"><i class="fas fa-users text-primary me-2"></i> Gerenciar Usuários</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('usuarios_novo') }}" class="btn btn-glass-success">
+            <i class="fas fa-user-plus me-2"></i> Novo Usuário
+        </a>
+    </div>
+</div>
+
+<div class="glass-card">
+    <div class="glass-card-body p-0">
+        <div class="table-responsive glass-table-wrapper border-0 rounded-0">
+            <table class="glass-table align-middle">
+                <thead>
+                    <tr>
+                        <th scope="col" style="width: 5%;">ID</th>
+                        <th scope="col">Nome</th>
+                        <th scope="col">Email</th>
+                        <th scope="col" class="text-center">Perfil</th>
+                        <th scope="col" class="text-center">Status</th>
+                        <th scope="col" class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usuario in usuarios %}
+                    <tr>
+                        <td class="text-secondary fw-bold">{{ usuario.id }}</td>
+                        <td class="text-white fw-bold">{{ usuario.nome }}</td>
+                        <td class="text-secondary">{{ usuario.email }}</td>
+                        <td class="text-center">
+                            <span class="badge py-1 px-3 {% if usuario.is_admin() %}badge-glass-warning{% else %}badge-glass-secondary{% endif %}">
+                                <i class="fas {% if usuario.is_admin() %}fa-user-shield{% else %}fa-user{% endif %} me-1"></i>
+                                {{ usuario.perfil|title }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            {% if usuario.ativo %}
+                                <span class="badge badge-glass-success py-1 px-3">Ativo</span>
+                            {% else %}
+                                <span class="badge badge-glass-danger py-1 px-3">Inativo</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group">
+                                <a href="{{ url_for('usuarios_editar', id=usuario.id) }}" class="btn btn-glass btn-sm"
+                                   title="Editar" style="color: #93c5fd;">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                
+                                {% if usuario.ativo and usuario.id != current_user.id %}
+                                <form method="POST" action="{{ url_for('usuarios_deletar', id=usuario.id) }}" 
+                                      style="display: inline;"
+                                      onsubmit="return confirm('Tem certeza que deseja DESATIVAR este usuário?');">
+                                    <button type="submit" class="btn btn-glass btn-sm" title="Desativar" style="color: #fca5a5;">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center p-4 text-secondary">
+                            <i class="fas fa-users-slash fa-3x mb-3 opacity-50"></i>
+                            <p>Nenhum usuário cadastrado.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

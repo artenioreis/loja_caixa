@@ -38,10 +38,34 @@ def create_app():
     """
     app = Flask(__name__)
     
-    # Configurações
-    app.config['SECRET_KEY'] = 'chave-secreta-desenvolvimento'
+    # =========================================================
+    # CONFIGURAÇÕES PARA REDE MULTI-PDV
+    # =========================================================
+    # SECRET_KEY fixa e forte — sessões sobrevivem a reinicializações
+    app.config['SECRET_KEY'] = 'NSG@2025#CaixaSeguro!K9mXpQrZ'
+
+    # SQLite com WAL mode para suportar leituras simultâneas de múltiplos PDVs
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///loja.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # Pool de conexões: permite múltiplas conexões simultâneas sem timeout
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'connect_args': {
+            'check_same_thread': False,   # Permite uso em múltiplas threads
+            'timeout': 30,                # Aguarda até 30s se o banco estiver ocupado
+        },
+        'pool_size': 10,                  # Conexões simultâneas no pool
+        'max_overflow': 20,               # Conexões extras em pico
+        'pool_timeout': 30,               # Timeout para obter conexão do pool
+        'pool_recycle': 1800,             # Recicla conexões a cada 30 min
+        'pool_pre_ping': True,            # Verifica conexão antes de usar
+    }
+
+    # Sessão permanente por 8 horas (turno de trabalho)
+    from datetime import timedelta
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = False  # True se usar HTTPS
     
     # --- CONFIGURAÇÕES DE UPLOAD ---
     # Caminho absoluto para salvar os arquivos
@@ -55,6 +79,22 @@ def create_app():
 
     # Inicializações
     db.init_app(app)
+
+    # Ativa WAL mode no SQLite ao criar conexão (melhora concorrência multi-PDV)
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+    import sqlite3
+
+    @event.listens_for(Engine, 'connect')
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        if isinstance(dbapi_connection, sqlite3.Connection):
+            cursor = dbapi_connection.cursor()
+            cursor.execute('PRAGMA journal_mode=WAL')    # Write-Ahead Logging
+            cursor.execute('PRAGMA synchronous=NORMAL')  # Balanço velocidade/segurança
+            cursor.execute('PRAGMA cache_size=-64000')   # Cache de 64MB
+            cursor.execute('PRAGMA foreign_keys=ON')     # Integridade referencial
+            cursor.execute('PRAGMA busy_timeout=30000')  # 30s de espera em lock
+            cursor.close()
     
     return app
 
@@ -1767,46 +1807,53 @@ def gerar_orcamento():
 # =============================================================================
 
 @app.route('/caixa/cupom_fechamento')
+@app.route('/caixa/cupom_fechamento/<int:movimento_id>')
 @login_required
-def cupom_fechamento():
+def cupom_fechamento(movimento_id=None):
     """
-    Gera um cupom/relatório de fechamento para o caixa ABERTO atual.
+    Gera um cupom/relatório de fechamento para o caixa ativo ou histórico.
     """
-    caixa_aberto, movimento_atual = get_caixa_aberto()
-    
-    if not caixa_aberto:
-        flash('Não há caixa aberto para gerar relatório.', 'warning')
-        if current_user.is_admin():
+    if movimento_id is not None:
+        movimento_atual = db.session.get(MovimentoCaixa, movimento_id)
+        if not movimento_atual:
+            flash('Movimento de caixa não encontrado.', 'danger')
             return redirect(url_for('dashboard'))
-        return redirect(url_for('vendas'))
+        # Verifica permissão: apenas Admin ou o próprio operador do caixa
+        if not current_user.is_admin() and movimento_atual.usuario_id != current_user.id:
+            flash('Acesso não autorizado!', 'danger')
+            return redirect(url_for('vendas'))
+    else:
+        caixa_aberto, movimento_atual = get_caixa_aberto()
+        if not caixa_aberto:
+            flash('Não há caixa aberto para gerar relatório.', 'warning')
+            if current_user.is_admin():
+                return redirect(url_for('dashboard'))
+            return redirect(url_for('vendas'))
 
-    # --- Recalcula os totais para o cupom ---
+    # Para buscar as vendas do período
+    data_limite = movimento_atual.data_fechamento if movimento_atual.status == 'fechado' else datetime.now()
     
-    # 1. Query base das vendas no período (abertura local até agora local)
     query_vendas = Venda.query.filter(
         Venda.data_venda >= movimento_atual.data_abertura,
-        Venda.data_venda <= datetime.now(), # CORRIGIDO (era utcnow)
-        Venda.usuario_id == current_user.id,
+        Venda.data_venda <= data_limite,
+        Venda.usuario_id == movimento_atual.usuario_id,
         Venda.status == 'finalizada'
     )
     
-    # 2. Total de Vendas (para contagem)
     vendas_periodo = query_vendas.all()
     total_vendas_count = len(vendas_periodo)
 
-    # 3. Agrupa os totais pelas novas colunas
     vendas_agrupadas = db.session.query(
         func.sum(Venda.valor_dinheiro - Venda.troco).label('dinheiro'),
         func.sum(Venda.valor_cartao).label('cartao'),
         func.sum(Venda.valor_pix).label('pix')
     ).filter(
         Venda.data_venda >= movimento_atual.data_abertura,
-        Venda.data_venda <= datetime.now(), # CORRIGIDO (era utcnow)
-        Venda.usuario_id == current_user.id,
+        Venda.data_venda <= data_limite,
+        Venda.usuario_id == movimento_atual.usuario_id,
         Venda.status == 'finalizada'
     ).first()
 
-    # 4. Prepara o dicionário de totais
     totais = {
         'dinheiro': float(vendas_agrupadas.dinheiro or 0.0),
         'cartao': float(vendas_agrupadas.cartao or 0.0),
@@ -1816,13 +1863,263 @@ def cupom_fechamento():
     }
     totais['total_geral'] = totais['dinheiro'] + totais['cartao'] + totais['pix']
     
-    # O "Saldo Esperado em Dinheiro"
     saldo_esperado_dinheiro = movimento_atual.saldo_inicial + totais['dinheiro']
 
     return render_template('cupom_fechamento.html', 
                          caixa=movimento_atual,
                          totais=totais,
                          saldo_esperado_dinheiro=saldo_esperado_dinheiro)
+
+# =============================================================================
+#           FIM DA NOVA ROTA (CUPOM FECHAMENTO)
+# =============================================================================
+
+# =============================================================================
+# RELATÓRIO DE FECHAMENTO DE CAIXA (NOVO)
+# =============================================================================
+@app.route('/relatorios/fechamento_caixa')
+@login_required
+def relatorio_fechamento_caixa():
+    """Rota para relatórios de fechamento de caixa dos operadores (Apenas Admin)"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('vendas'))
+
+    data_inicio_str = request.args.get('inicio')
+    data_fim_str = request.args.get('fim')
+    
+    caixa_id_str = request.args.get('caixa_id', '0')
+    caixa_selecionado = 0
+    try:
+        caixa_selecionado = int(caixa_id_str)
+    except ValueError:
+        caixa_selecionado = 0
+
+    status_selecionado = request.args.get('status', 'todos')
+
+    hoje_local = date.today()
+    if not data_inicio_str:
+        data_inicio_str = (hoje_local - timedelta(days=6)).strftime('%Y-%m-%d')
+    if not data_fim_str:
+        data_fim_str = hoje_local.strftime('%Y-%m-%d')
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+    except ValueError:
+        flash('Formato de data inválido.', 'danger')
+        data_fim = datetime.now().replace(hour=23, minute=59, second=59)
+        data_inicio = (data_fim - timedelta(days=6)).replace(hour=0, minute=0, second=0)
+        data_inicio_str = data_inicio.strftime('%Y-%m-%d')
+        data_fim_str = data_fim.strftime('%Y-%m-%d')
+
+    operadores = Usuario.query.filter(
+        Usuario.perfil.in_(['caixa', 'admin']),
+        Usuario.ativo == True
+    ).order_by(Usuario.nome).all()
+
+    query = MovimentoCaixa.query.filter(
+        MovimentoCaixa.data_abertura.between(data_inicio, data_fim)
+    )
+
+    if caixa_selecionado > 0:
+        query = query.filter(MovimentoCaixa.usuario_id == caixa_selecionado)
+
+    if status_selecionado != 'todos':
+        query = query.filter(MovimentoCaixa.status == status_selecionado)
+
+    movimentos = query.order_by(MovimentoCaixa.data_abertura.desc()).all()
+
+    movimentos_processados = []
+    totais_gerais = {
+        'total_inicial': 0.0,
+        'total_vendas_dinheiro': 0.0,
+        'total_vendas_cartao': 0.0,
+        'total_vendas_pix': 0.0,
+        'total_vendido': 0.0,
+        'total_esperado': 0.0,
+        'total_informado': 0.0,
+        'total_diferenca': 0.0,
+        'qtd_caixas_fechados': 0
+    }
+
+    for mov in movimentos:
+        data_limite = mov.data_fechamento if mov.data_fechamento else datetime.now()
+        
+        vendas_resumo = db.session.query(
+            func.sum(Venda.valor_dinheiro - Venda.troco).label('dinheiro'),
+            func.sum(Venda.valor_cartao).label('cartao'),
+            func.sum(Venda.valor_pix).label('pix'),
+            func.count(Venda.id).label('qtd_vendas')
+        ).filter(
+            Venda.data_venda >= mov.data_abertura,
+            Venda.data_venda <= data_limite,
+            Venda.usuario_id == mov.usuario_id,
+            Venda.status == 'finalizada'
+        ).first()
+        
+        dinheiro = float(vendas_resumo.dinheiro or 0.0)
+        cartao = float(vendas_resumo.cartao or 0.0)
+        pix = float(vendas_resumo.pix or 0.0)
+        total_vendas = dinheiro + cartao + pix
+        qtd_vendas = int(vendas_resumo.qtd_vendas or 0)
+        
+        saldo_esperado = mov.saldo_inicial + dinheiro
+        diferenca = 0.0
+        if mov.status == 'fechado':
+            diferenca = (mov.saldo_final or 0.0) - saldo_esperado
+            totais_gerais['total_informado'] += (mov.saldo_final or 0.0)
+            totais_gerais['total_diferenca'] += diferenca
+            totais_gerais['qtd_caixas_fechados'] += 1
+            
+        totais_gerais['total_inicial'] += mov.saldo_inicial
+        totais_gerais['total_vendas_dinheiro'] += dinheiro
+        totais_gerais['total_vendas_cartao'] += cartao
+        totais_gerais['total_vendas_pix'] += pix
+        totais_gerais['total_vendido'] += total_vendas
+        totais_gerais['total_esperado'] += saldo_esperado
+
+        movimentos_processados.append({
+            'id': mov.id,
+            'operador': mov.usuario.nome,
+            'status': mov.status,
+            'data_abertura': mov.data_abertura,
+            'data_fechamento': mov.data_fechamento,
+            'saldo_inicial': mov.saldo_inicial,
+            'saldo_final': mov.saldo_final,
+            'vendas_dinheiro': dinheiro,
+            'vendas_cartao': cartao,
+            'vendas_pix': pix,
+            'total_vendas': total_vendas,
+            'qtd_vendas': qtd_vendas,
+            'saldo_esperado': saldo_esperado,
+            'diferenca': diferenca
+        })
+
+    return render_template(
+        'relatorio_fechamento_caixa.html',
+        movimentos=movimentos_processados,
+        operadores=operadores,
+        data_inicio=data_inicio_str,
+        data_fim=data_fim_str,
+        caixa_selecionado=caixa_selecionado,
+        status_selecionado=status_selecionado,
+        totais_gerais=totais_gerais
+    )
+
+@app.route('/relatorios/fechamento_caixa/exportar')
+@login_required
+def exportar_relatorio_fechamento_caixa():
+    """Gera e baixa uma planilha Excel com os dados do relatório de fechamento de caixas"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('vendas'))
+
+    data_inicio_str = request.args.get('inicio')
+    data_fim_str = request.args.get('fim')
+    caixa_id_str = request.args.get('caixa_id', '0')
+    caixa_selecionado = int(caixa_id_str)
+    status_selecionado = request.args.get('status', 'todos')
+
+    hoje_local = date.today()
+    if not data_inicio_str:
+        data_inicio_str = (hoje_local - timedelta(days=6)).strftime('%Y-%m-%d')
+    if not data_fim_str:
+        data_fim_str = hoje_local.strftime('%Y-%m-%d')
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+    except ValueError:
+        data_fim = datetime.now().replace(hour=23, minute=59, second=59)
+        data_inicio = (data_fim - timedelta(days=6)).replace(hour=0, minute=0, second=0)
+
+    query = MovimentoCaixa.query.filter(
+        MovimentoCaixa.data_abertura.between(data_inicio, data_fim)
+    )
+
+    if caixa_selecionado > 0:
+        query = query.filter(MovimentoCaixa.usuario_id == caixa_selecionado)
+
+    if status_selecionado != 'todos':
+        query = query.filter(MovimentoCaixa.status == status_selecionado)
+
+    movimentos = query.order_by(MovimentoCaixa.data_abertura.desc()).all()
+
+    rows = []
+    for mov in movimentos:
+        data_limite = mov.data_fechamento if mov.data_fechamento else datetime.now()
+        
+        vendas_resumo = db.session.query(
+            func.sum(Venda.valor_dinheiro - Venda.troco).label('dinheiro'),
+            func.sum(Venda.valor_cartao).label('cartao'),
+            func.sum(Venda.valor_pix).label('pix'),
+            func.count(Venda.id).label('qtd_vendas')
+        ).filter(
+            Venda.data_venda >= mov.data_abertura,
+            Venda.data_venda <= data_limite,
+            Venda.usuario_id == mov.usuario_id,
+            Venda.status == 'finalizada'
+        ).first()
+        
+        dinheiro = float(vendas_resumo.dinheiro or 0.0)
+        cartao = float(vendas_resumo.cartao or 0.0)
+        pix = float(vendas_resumo.pix or 0.0)
+        total_vendas = dinheiro + cartao + pix
+        qtd_vendas = int(vendas_resumo.qtd_vendas or 0)
+        
+        saldo_esperado = mov.saldo_inicial + dinheiro
+        diferenca = 0.0
+        if mov.status == 'fechado':
+            diferenca = (mov.saldo_final or 0.0) - saldo_esperado
+            
+        rows.append({
+            'Operador': mov.usuario.nome,
+            'Status': 'Aberto' if mov.status == 'aberto' else 'Fechado',
+            'Data Abertura': mov.data_abertura.strftime('%d/%m/%Y %H:%M:%S'),
+            'Data Fechamento': mov.data_fechamento.strftime('%d/%m/%Y %H:%M:%S') if mov.data_fechamento else '-',
+            'Saldo Inicial (R$)': mov.saldo_inicial,
+            'Vendas Dinheiro (R$)': dinheiro,
+            'Vendas Cartão (R$)': cartao,
+            'Vendas PIX (R$)': pix,
+            'Total Vendido (R$)': total_vendas,
+            'Nº Vendas': qtd_vendas,
+            'Saldo Esperado Dinheiro (R$)': saldo_esperado,
+            'Saldo Final Contado (R$)': mov.saldo_final if mov.status == 'fechado' else '-',
+            'Diferença (R$)': diferenca if mov.status == 'fechado' else '-'
+        })
+
+    df = pd.DataFrame(rows)
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Fechamentos', index=False)
+        worksheet = writer.sheets['Fechamentos']
+        
+        # Estilização do cabeçalho com openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+        header_font = Font(name='Arial', size=11, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='1E293B', end_color='1E293B', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        
+        for cell in worksheet[1]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            
+        # Ajusta a largura das colunas
+        for col in worksheet.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = col[0].column_letter
+            worksheet.column_dimensions[col_letter].width = max(max_len + 3, 10)
+
+    output.seek(0)
+    
+    response = make_response(output.read())
+    response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    response.headers['Content-Disposition'] = f'attachment; filename=relatorio_fechamento_caixas_{data_inicio_str}_a_{data_fim_str}.xlsx'
+    
+    return response
 
 # =============================================================================
 #           FIM DA NOVA ROTA (CUPOM FECHAMENTO)
@@ -1979,18 +2276,35 @@ def extrato_estoque():
                            tipo_selecionado=tipo_movimento_str)
 
 if __name__ == '__main__':
-    # Garante que o init_db() rode dentro do contexto da app
     with app.app_context():
-        # Verifica se o banco de dados já existe antes de inicializar
-        # CORREÇÃO: o app.instance_path é o local correto para o 'loja.db'
         db_path = os.path.join(app.instance_path, 'loja.db')
         if not os.path.exists(db_path):
             print(f"Banco de dados não encontrado em {db_path}. Inicializando...")
-            # Cria o diretório 'instance' se não existir
             os.makedirs(app.instance_path, exist_ok=True)
             init_db()
         else:
-            print(f"Banco de dados encontrado em {db_path}. Pulando inicialização.")
-            
-    app.run(debug=True, host='0.0.0.0', port=5000)
+            print(f"Banco de dados encontrado em {db_path}.")
 
+    # =========================================================
+    # SERVIDOR PARA REDE MULTI-PDV
+    # =========================================================
+    import socket
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    print("")
+    print("=" * 55)
+    print("  SISTEMA DE CAIXA - MODO REDE MULTI-PDV")
+    print("=" * 55)
+    print(f"  Acesse neste computador:  http://localhost:5000")
+    print(f"  Acesse em outros PDVs:    http://{local_ip}:5000")
+    print("  (outros PDVs devem estar na mesma rede Wi-Fi/LAN)")
+    print("=" * 55)
+    print("")
+
+    app.run(
+        host='0.0.0.0',       # Aceita conexões de qualquer IP da rede
+        port=5000,
+        debug=False,          # DESLIGADO em produção (mais estável)
+        threaded=True,        # Atende múltiplos PDVs simultaneamente
+        use_reloader=False,   # Evita dupla inicialização
+    )

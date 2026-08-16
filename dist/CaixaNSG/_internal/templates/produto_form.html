@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if produto %}Editar Produto{% else %}Novo Produto{% endif %} - Sistema de Caixa
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center pt-3 mt-4">
+    <div class="col-md-10">
+        <div class="glass-card shadow-lg" style="border-top: 4px solid {% if produto %}#3b82f6{% else %}#10b981{% endif %};">
+            <div class="glass-card-header pt-4 pb-3" style="background: rgba(0,0,0,0.15); border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <h4 class="mb-0 text-white fw-bold d-flex align-items-center">
+                    {% if produto %}
+                        <i class="fas fa-edit text-primary fa-2x me-3" style="filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.5));"></i> 
+                        Editar Produto: {{ produto.nome }}
+                    {% else %}
+                        <i class="fas fa-plus-circle text-success fa-2x me-3" style="filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.5));"></i> 
+                        Cadastrar Novo Produto
+                    {% endif %}
+                </h4>
+            </div>
+            
+            <div class="glass-card-body p-4">
+                <form method="POST" action="{% if produto %}{{ url_for('produtos_editar', id=produto.id) }}{% else %}{{ url_for('produtos_novo') }}{% endif %}" enctype="multipart/form-data">
+                    
+                    <div class="row g-4">
+                        <div class="col-md-8">
+                            <div class="p-4 rounded h-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05);">
+                                <div class="mb-4">
+                                    <label for="nome" class="form-label text-secondary fw-bold">Nome do Produto:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text border-0" style="background: rgba(0,0,0,0.3); color: #94a3b8;"><i class="fas fa-box"></i></span>
+                                        <input type="text" class="form-control glass-input" id="nome" name="nome" 
+                                               value="{{ produto.nome if produto else '' }}" required placeholder="Ex: Cerveja Heineken Long Neck">
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label for="codigo_barras" class="form-label text-secondary fw-bold">Código de Barras (SKU):</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text border-0" style="background: rgba(0,0,0,0.3); color: #94a3b8;"><i class="fas fa-barcode"></i></span>
+                                        <input type="text" class="form-control glass-input text-info fw-bold" id="codigo_barras" name="codigo_barras"
+                                               value="{{ produto.codigo_barras if produto else '' }}" required placeholder="Leia o código ou digite...">
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label for="descricao" class="form-label text-secondary fw-bold">Descrição (Opcional):</label>
+                                    <textarea class="form-control glass-input" id="descricao" name="descricao" rows="3" placeholder="Detalhes do produto...">{{ produto.descricao if produto else '' }}</textarea>
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-6">
+                                        <label for="preco_venda" class="form-label text-secondary fw-bold">Preço de Venda (R$):</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text border-0" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7;"><i class="fas fa-dollar-sign"></i></span>
+                                            <input type="number" step="0.01" class="form-control glass-input text-success fw-bold fs-5" id="preco_venda" name="preco_venda"
+                                                   value="{{ produto.preco_venda if produto else '0.00' }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="preco_custo" class="form-label text-secondary fw-bold">Preço de Custo (R$):</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text border-0" style="background: rgba(239, 68, 68, 0.2); color: #fca5a5;"><i class="fas fa-file-invoice-dollar"></i></span>
+                                            <input type="number" step="0.01" class="form-control glass-input" id="preco_custo" name="preco_custo"
+                                                   value="{{ produto.preco_custo if produto else '0.00' }}" required>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-6">
+                                        <label for="estoque_atual" class="form-label text-secondary fw-bold">Estoque Atual:</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text border-0" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd;"><i class="fas fa-cubes"></i></span>
+                                            <input type="number" class="form-control glass-input" id="estoque_atual" name="estoque_atual"
+                                                   value="{{ produto.estoque_atual if produto else '0' }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="estoque_minimo" class="form-label text-secondary fw-bold">Estoque Mínimo (Alerta):</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text border-0" style="background: rgba(245, 158, 11, 0.2); color: #fde68a;"><i class="fas fa-exclamation-triangle"></i></span>
+                                            <input type="number" class="form-control glass-input" id="estoque_minimo" name="estoque_minimo"
+                                                   value="{{ produto.estoque_minimo if produto else '0' }}" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-2">
+                                    <label for="categoria" class="form-label text-secondary fw-bold">Categoria:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text border-0" style="background: rgba(0,0,0,0.3); color: #94a3b8;"><i class="fas fa-tags"></i></span>
+                                        <input type="text" class="form-control glass-input" id="categoria" name="categoria"
+                                               value="{{ produto.categoria if produto else '' }}" placeholder="Ex: Bebidas">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="p-4 rounded h-100 d-flex flex-column" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05);">
+                                <h6 class="text-secondary fw-bold mb-3 border-bottom border-secondary border-opacity-25 pb-2"><i class="fas fa-camera me-2"></i> Mídia</h6>
+                                <div class="mb-4">
+                                    <label for="imagem" class="form-label text-secondary">Imagem do Produto:</label>
+                                    <input type="file" class="form-control glass-input form-control-sm" id="imagem" name="imagem" accept="image/*">
+                                </div>
+                                
+                                <div class="flex-grow-1 d-flex justify-content-center align-items-center">
+                                    {% if produto and produto.imagem_url %}
+                                    <div class="text-center w-100">
+                                        <img src="{{ url_for('static', filename=produto.imagem_url.replace('static/', '', 1)) }}" 
+                                             alt="{{ produto.nome }}" class="img-fluid rounded shadow" style="max-height: 220px; object-fit: contain; border: 2px solid rgba(255,255,255,0.1);">
+                                        <span class="badge badge-glass-success mt-3 d-block py-2"><i class="fas fa-check me-1"></i> Imagem Atual</span>
+                                    </div>
+                                    {% else %}
+                                    <div class="text-center w-100 p-4 rounded" style="background: rgba(0,0,0,0.2); border: 1px dashed rgba(255,255,255,0.2);">
+                                        <i class="fas fa-image fa-4x mb-3 text-secondary opacity-50"></i>
+                                        <p class="text-secondary mb-0">Nenhuma imagem carregada</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-top border-secondary border-opacity-25 d-flex gap-3 justify-content-end">
+                        <a href="{{ url_for('produtos') }}" class="btn btn-glass px-4 py-2 text-white">
+                            <i class="fas fa-arrow-left me-2"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn {% if produto %}btn-glass-primary{% else %}btn-glass-success{% endif %} px-4 py-2 fw-bold shadow">
+                            <i class="fas fa-save me-2"></i> 
+                            {% if produto %}Salvar Alterações{% else %}Cadastrar Produto{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

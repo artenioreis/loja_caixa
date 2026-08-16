@@ -1,0 +1,1168 @@
+{% extends "base.html" %}
+
+{% block title %}PDV - Vendas - Sistema de Caixa{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Estilo para a lista de itens da venda (carrinho) */
+    .carrinho-lista {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    .total-display {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+    }
+    /* Estilo para info do produto */
+    #produto-info {
+        min-height: 200px; /* Aumenta altura para caber a imagem */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    #produto-info-img {
+        max-height: 120px;
+        max-width: 100%;
+        object-fit: contain;
+        margin-bottom: 10px;
+    }
+
+    /* ======================================================= */
+    /* INÍCIO DO NOVO CSS (MODAL DE BUSCA)           */
+    /* ======================================================= */
+    #lista-resultados-busca {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    /* Estilo para o item da lista de busca */
+    .resultado-item-busca img {
+        width: 50px;
+        height: 50px;
+        object-fit: cover;
+        margin-right: 15px;
+        border-radius: 5px;
+    }
+    
+    .resultado-item-busca .info {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    
+    .resultado-item-busca .info .nome {
+        font-weight: bold;
+        color: #0d6efd; /* Azul do Bootstrap */
+    }
+    
+    .resultado-item-busca .info .detalhes {
+        font-size: 0.85rem;
+        color: #6c757d; /* Cinza do Bootstrap */
+    }
+    
+    .resultado-item-busca .preco {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #198754; /* Verde do Bootstrap */
+        white-space: nowrap; /* Impede que o preço quebre a linha */
+    }
+    /* ======================================================= */
+    /* FIM DO NOVO CSS (MODAL DE BUSCA)            */
+    /* ======================================================= */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom border-secondary border-opacity-25">
+    <h1 class="h2 text-white fw-bold"><i class="fas fa-shopping-cart text-primary me-2"></i> Frente de Caixa (PDV)</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <span class="badge badge-glass-success fs-6 px-3 py-2 rounded-pill">
+            <i class="fas fa-lock-open me-1"></i> Caixa Aberto (Saldo Inicial: R$ {{ "%.2f"|format(movimento_atual.saldo_inicial) }})
+        </span>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Painel de Lançamento -->
+    <div class="col-md-5">
+        <div class="glass-card mb-4">
+            <div class="glass-card-header">
+                <i class="fas fa-barcode text-primary me-2"></i> Lançar Produto
+            </div>
+            <div class="glass-card-body">
+                <div class="mb-3">
+                    <label for="codigo_barras" class="form-label text-secondary fw-bold">Código de Barras ou ID:</label>
+                    <input type="text" class="form-control form-control-lg glass-input" id="codigo_barras" 
+                           placeholder="Leia o código ou digite..." autofocus>
+                </div>
+                
+                <div id="produto-info" class="text-center p-3 rounded" style="background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.05); min-height: 180px;">
+                    <p class="text-muted mt-4">Aguardando produto...</p>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-md-5 mb-2">
+                        <label for="quantidade" class="form-label text-secondary fw-bold">Quantidade:</label>
+                        <input type="number" class="form-control glass-input fs-5" id="quantidade" value="1" min="1">
+                    </div>
+                    <div class="col-md-7 d-grid align-items-end">
+                        <button class="btn btn-glass-primary btn-lg mb-2" id="btn-adicionar">
+                            <i class="fas fa-plus me-1"></i> Adicionar <small>(Enter)</small>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="glass-card mb-4">
+            <div class="glass-card-body p-3">
+                <h6 class="text-secondary fw-bold mb-3"><i class="fas fa-keyboard me-2"></i> Atalhos do Sistema</h6>
+                <div class="row g-2 text-white" style="font-size: 0.9rem;">
+                    <div class="col-6"><kbd class="bg-primary">Enter</kbd> Adicionar</div>
+                    <div class="col-6"><kbd class="bg-info">F2</kbd> Buscar Nome</div>
+                    <div class="col-6"><kbd class="bg-success">F6</kbd> Finalizar</div>
+                    <div class="col-6"><kbd class="bg-danger">F3</kbd> Cancelar</div>
+                    {% if orcamento_ativo %}
+                    <div class="col-6"><kbd class="bg-warning text-dark">F4</kbd> Gerar Orç.</div>
+                    <div class="col-6"><kbd class="bg-secondary">F8</kbd> Listar Orç.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Carrinho de Compras -->
+    <div class="col-md-7">
+        <div class="glass-card h-100 d-flex flex-column">
+            <div class="glass-card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-list-ul text-info me-2"></i> Itens da Venda</span>
+                <span id="badge-orcamento" class="badge badge-glass-warning d-none"></span>
+            </div>
+            <div class="glass-card-body p-0 flex-grow-1">
+                <div class="table-responsive carrinho-lista glass-table-wrapper border-0 rounded-0">
+                    <table class="glass-table mb-0 fs-6 align-middle">
+                        <thead>
+                            <tr>
+                                <th scope="col" style="width: 5%;">#</th>
+                                <th scope="col">Produto</th>
+                                <th scope="col" style="width: 25%;">Qtd.</th>
+                                <th scope="col">Vl. Unit.</th>
+                                <th scope="col">Subtotal</th>
+                                <th scope="col" style="width: 10%;">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="carrinho-tbody">
+                            <!-- Itens do carrinho são inseridos aqui via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="p-4" style="background: rgba(0,0,0,0.25); border-top: 1px solid rgba(255,255,255,0.05);">
+                <div class="row align-items-center mb-3 p-3 rounded" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
+                    <div class="col-md-5 text-center text-md-start mb-2 mb-md-0">
+                        <h5 class="text-secondary mb-0">Total de Itens: <span id="total-itens" class="text-white fw-bold ms-2">0</span></h5>
+                    </div>
+                    <div class="col-md-7 text-center text-md-end">
+                        <h2 class="mb-0 fw-bold d-flex align-items-center justify-content-md-end justify-content-center">
+                            <span class="text-secondary me-3" style="font-size: 1.2rem;">TOTAL A PAGAR</span>
+                            <span id="total-venda" class="text-success" style="font-size: 2.2rem; filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.4));">R$ 0.00</span>
+                        </h2>
+                    </div>
+                </div>
+                
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <button class="btn btn-glass-success w-100 py-3 fs-5 fw-bold" id="btn-finalizar" data-bs-toggle="modal" data-bs-target="#modalFinalizar">
+                            <i class="fas fa-check-circle me-2"></i> Finalizar Venda (F6)
+                        </button>
+                    </div>
+                    <div class="col-md-6 d-flex flex-column gap-2">
+                        <div class="d-flex gap-2 h-50">
+                            {% if orcamento_ativo %}
+                            <button class="btn btn-glass w-50" id="btn-orcamento" style="color: #fde68a; border-color: rgba(245, 158, 11, 0.4);">
+                                <i class="fas fa-file-invoice-dollar"></i> Gerar Orç. (F4)
+                            </button>
+                            <button class="btn btn-glass w-50" id="btn-listar-orcamentos" data-bs-toggle="modal" data-bs-target="#modalBuscarOrcamento" style="color: #bae6fd; border-color: rgba(14, 165, 233, 0.4);">
+                                <i class="fas fa-list"></i> Ver Orç. (F8)
+                            </button>
+                            {% else %}
+                            <button class="btn btn-glass w-100" disabled style="opacity: 0.5;">
+                                <i class="fas fa-file-invoice-dollar"></i> Orçamentos Desativados
+                            </button>
+                            {% endif %}
+                        </div>
+                        <button class="btn btn-glass w-100 h-50" id="btn-cancelar" style="color: #fca5a5; border-color: rgba(239, 68, 68, 0.4);">
+                            <i class="fas fa-times me-2"></i> Cancelar Venda (F3)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================= -->
+<!--           INÍCIO DO NOVO HTML (MODAL DE BUSCA)          -->
+<!-- ======================================================= -->
+<div class="modal fade" id="modalBuscarProduto" tabindex="-1" aria-labelledby="modalBuscarProdutoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-card border-0">
+            <div class="modal-header" style="background: rgba(59, 130, 246, 0.2); border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <h5 class="modal-title fw-bold" id="modalBuscarProdutoLabel"><i class="fas fa-search text-primary me-2"></i> Buscar Produto por Nome</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label for="input-busca-nome" class="form-label text-secondary fw-bold">Digite o nome ou código do produto:</label>
+                    <input type="text" class="form-control form-control-lg glass-input" id="input-busca-nome" placeholder="Ex: Arroz ou 789...">
+                </div>
+                <hr class="border-secondary border-opacity-25 my-4">
+                <div id="lista-resultados-busca" class="p-3 rounded" style="background: rgba(0,0,0,0.2); border: 1px dashed rgba(255,255,255,0.1);">
+                    <p class="text-center text-muted mb-0">Aguardando digitação (mín. 2 caracteres)...</p>
+                    <!-- Os resultados da busca serão inseridos aqui pelo JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ======================================================= -->
+<!--             FIM DO NOVO HTML (MODAL DE BUSCA)           -->
+<!-- ======================================================= -->
+
+<!-- ======================================================= -->
+<!--           INÍCIO DO NOVO HTML (MODAL DE ORÇAMENTOS)     -->
+<!-- ======================================================= -->
+<div class="modal fade" id="modalBuscarOrcamento" tabindex="-1" aria-labelledby="modalBuscarOrcamentoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-card border-0">
+            <div class="modal-header" style="background: rgba(14, 165, 233, 0.2); border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <h5 class="modal-title fw-bold" id="modalBuscarOrcamentoLabel"><i class="fas fa-list text-info me-2"></i> Orçamentos Pendentes</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive glass-table-wrapper border-0 rounded-0">
+                    <table class="glass-table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Data</th>
+                                <th>Operador</th>
+                                <th>Total</th>
+                                <th class="text-center">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-orcamentos-body">
+                            <tr><td colspan="5" class="text-center p-4 text-muted">Carregando orçamentos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ======================================================= -->
+<!--             FIM DO NOVO HTML (MODAL DE ORÇAMENTOS)      -->
+<!-- ======================================================= -->
+
+
+<!-- Modal Finalizar (Existente) -->
+<div class="modal fade" id="modalFinalizar" tabindex="-1" aria-labelledby="modalFinalizarLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-card border-0" style="border-top: 4px solid #10b981 !important;">
+            <div class="modal-header" style="background: rgba(16, 185, 129, 0.15); border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <h5 class="modal-title fw-bold" id="modalFinalizarLabel"><i class="fas fa-check-circle text-success me-2"></i> Finalizar Venda</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="mb-4">
+                            <label for="forma_pagamento" class="form-label text-secondary fw-bold">Forma de Pagamento:</label>
+                            <select class="form-select form-select-lg glass-input" id="forma_pagamento">
+                                <option value="dinheiro" class="text-dark">Dinheiro</option>
+                                <option value="cartao" class="text-dark">Cartão</option>
+                                <option value="pix" class="text-dark">PIX</option>
+                                <option value="multiplo" class="text-dark">Múltiplo</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4" id="campo-valor-pago">
+                            <label for="valor_pago" class="form-label text-secondary fw-bold">Valor Pago (R$):</label>
+                            <input type="number" step="0.01" class="form-control form-control-lg glass-input text-info fw-bold" id="valor_pago" placeholder="0.00">
+                        </div>
+                        
+                        <div id="campos-multiplo" style="display: none;">
+                            <div class="p-3 rounded mb-3" style="background: rgba(0,0,0,0.2); border: 1px dashed rgba(255,255,255,0.1);">
+                                <div class="mb-3">
+                                    <label for="valor_multiplo_dinheiro" class="form-label text-secondary fw-bold"><i class="fas fa-money-bill-wave me-1"></i> Em Dinheiro (R$):</label>
+                                    <input type="number" step="0.01" class="form-control glass-input" id="valor_multiplo_dinheiro" placeholder="0.00">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="valor_multiplo_cartao" class="form-label text-secondary fw-bold"><i class="fas fa-credit-card me-1"></i> No Cartão (R$):</label>
+                                    <input type="number" step="0.01" class="form-control glass-input" id="valor_multiplo_cartao" placeholder="0.00">
+                                </div>
+                                <div class="mb-2">
+                                    <label for="valor_multiplo_pix" class="form-label text-secondary fw-bold"><i class="fab fa-pix me-1"></i> No PIX (R$):</label>
+                                    <input type="number" step="0.01" class="form-control glass-input" id="valor_multiplo_pix" placeholder="0.00">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3 text-center p-3 rounded" id="campo-pix-qrcode" style="display: none; background: rgba(0,0,0,0.2);">
+                            <label class="form-label text-white fw-bold"><i class="fab fa-pix text-info me-2"></i> Pague com PIX</label>
+                            <p class="text-secondary" style="font-size: 0.9rem;">
+                                Aponte a câmera para o QR Code e transfira o valor exato (R$ <span id="modal-total-pix" class="text-white fw-bold">0.00</span>).
+                            </p>
+                            
+                            <img src="{{ url_for('static', filename='images/qrcode_pix_loja.png') }}" 
+                                 alt="QR Code PIX da Loja" 
+                                 class="img-fluid rounded border border-secondary p-1 bg-white" 
+                                 style="max-width: 200px;">
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="p-4 rounded h-100 d-flex flex-column justify-content-center align-items-center text-center" style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.05);">
+                            <h5 class="text-secondary mb-2">Total a Pagar:</h5>
+                            <h1 id="modal-total-venda" class="display-5 fw-bold mb-4" style="color: #6ee7b7; filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.4));">R$ 0.00</h1>
+                            
+                            <div class="w-100 border-top border-secondary border-opacity-25 my-2"></div>
+                            
+                            <h5 class="text-secondary mt-3 mb-2">Troco a Devolver:</h5>
+                            <h1 id="modal-troco" class="display-6 fw-bold text-info mb-0">R$ 0.00</h1>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.05);">
+                <button type="button" class="btn btn-glass px-4" data-bs-dismiss="modal">Voltar</button>
+                <button type="button" class="btn btn-glass-success btn-lg px-4 fw-bold shadow" id="btn-confirmar-venda">
+                    <i class="fas fa-save me-2"></i> Confirmar Venda
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // =========================================================================
+    // VARIÁVEIS DE ESTADO
+    // =========================================================================
+    let carrinho = []; // Armazena os itens da venda ( [{id, nome, preco, qtd, subtotal}, ...] )
+    let produtoAtual = null; // Armazena o último produto buscado
+    let orcamentoCarregadoId = null; // Armazena o ID do orçamento se um for carregado
+    
+    // =========================================================================
+    // ELEMENTOS DOM
+    // =========================================================================
+    const inputCodigoBarras = document.getElementById('codigo_barras');
+    const inputQuantidade = document.getElementById('quantidade');
+    const btnAdicionar = document.getElementById('btn-adicionar');
+    const infoProdutoDiv = document.getElementById('produto-info');
+    const carrinhoTbody = document.getElementById('carrinho-tbody');
+    const totalItensSpan = document.getElementById('total-itens');
+    const totalVendaSpan = document.getElementById('total-venda');
+    const btnFinalizar = document.getElementById('btn-finalizar');
+    const btnOrcamento = document.getElementById('btn-orcamento');
+    const btnCancelar = document.getElementById('btn-cancelar');
+    
+    // --- Modal Finalizar (Existente) ---
+    const modalFinalizarVenda = new bootstrap.Modal(document.getElementById('modalFinalizar'));
+    const modalTotalVenda = document.getElementById('modal-total-venda');
+    const modalTroco = document.getElementById('modal-troco');
+    const selectFormaPagamento = document.getElementById('forma_pagamento');
+    const inputValorPago = document.getElementById('valor_pago');
+    const campoValorPago = document.getElementById('campo-valor-pago');
+    const btnConfirmarVenda = document.getElementById('btn-confirmar-venda');
+    
+    // --- Novos campos para múltiplo ---
+    const camposMultiplo = document.getElementById('campos-multiplo');
+    const inputValorMultiploDinheiro = document.getElementById('valor_multiplo_dinheiro');
+    const inputValorMultiploCartao = document.getElementById('valor_multiplo_cartao');
+    const inputValorMultiploPix = document.getElementById('valor_multiplo_pix');
+    
+    // --- Elementos PIX (Existente) ---
+    const campoPixQrcode = document.getElementById('campo-pix-qrcode');
+    const modalTotalPix = document.getElementById('modal-total-pix');
+
+    // =========================================================================
+    //           INÍCIO DOS NOVOS ELEMENTOS (MODAL DE BUSCA)
+    // =========================================================================
+    const modalBusca = new bootstrap.Modal(document.getElementById('modalBuscarProduto'));
+    const inputBuscaNome = document.getElementById('input-busca-nome');
+    const listaResultadosBusca = document.getElementById('lista-resultados-busca');
+    let buscaTypingTimer; // Timer para o debounce da busca por nome
+    // =========================================================================
+    //             FIM DOS NOVOS ELEMENTOS
+    // =========================================================================
+
+    // =========================================================================
+    // FUNÇÕES PRINCIPAIS
+    // =========================================================================
+
+    /**
+     * Busca o produto na API do backend
+     */
+    async function buscarProduto(forceSearch = false) {
+        const codigo = inputCodigoBarras.value;
+
+        // Adiciona uma verificação para código vazio
+        if (codigo.length === 0) {
+            limparInfoProduto();
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/produto/${codigo}`);
+            
+            if (!response.ok) {
+                const error = await response.json();
+                infoProdutoDiv.innerHTML = `<p class="text-danger fw-bold">${error.error}</p>`;
+                produtoAtual = null;
+                return;
+            }
+
+            const produto = await response.json();
+            produtoAtual = produto; // Armazena o produto encontrado
+            
+            // --- ATUALIZAÇÃO PARA MOSTRAR IMAGEM ---
+            let img_html = '';
+            if (produto.imagem_url) {
+                // A API agora retorna a URL completa
+                img_html = `<img src="${produto.imagem_url}" alt="${produto.nome}" id="produto-info-img">`;
+            } else {
+                img_html = '<i class="fas fa-image fa-3x text-muted mb-2"></i>';
+            }
+            
+            // Atualiza o painel de informações
+            infoProdutoDiv.innerHTML = `
+                ${img_html}
+                <h5 class="text-primary mb-0">${produto.nome}</h5>
+                <h3 class="fw-bold">R$ ${produto.preco_venda.toFixed(2)}</h3>
+                <small class="text-muted">Estoque: ${produto.estoque_atual}</small>
+            `;
+            // ----------------------------------------
+            
+            // Foca na quantidade para o usuário confirmar
+            inputQuantidade.focus();
+            inputQuantidade.select();
+
+        } catch (error) {
+            console.error('Erro ao buscar produto:', error);
+            infoProdutoDiv.innerHTML = `<p class="text-danger">Erro de conexão.</p>`;
+            produtoAtual = null;
+        }
+    }
+    
+    /**
+     * Adiciona o produto_atual ao carrinho
+     */
+    function adicionarAoCarrinho() {
+        if (!produtoAtual) {
+            alert('Nenhum produto selecionado. Busque um produto primeiro.');
+            inputCodigoBarras.focus();
+            return;
+        }
+
+        const quantidade = parseInt(inputQuantidade.value);
+        if (isNaN(quantidade) || quantidade <= 0) {
+            alert('Quantidade inválida.');
+            return;
+        }
+
+        // Verifica se o item já está no carrinho
+        const itemExistente = carrinho.find(item => item.id === produtoAtual.id);
+        
+        let qtdDesejada = quantidade;
+        if (itemExistente) {
+            qtdDesejada += itemExistente.qtd;
+        }
+        
+        // Verifica o estoque
+        if (qtdDesejada > produtoAtual.estoque_atual) {
+            alert(`Estoque insuficiente! O estoque atual é de ${produtoAtual.estoque_atual} unidade(s).`);
+            inputQuantidade.focus();
+            return;
+        }
+
+        if (itemExistente) {
+            // Apenas atualiza a quantidade
+            itemExistente.qtd += quantidade;
+            itemExistente.subtotal = itemExistente.preco * itemExistente.qtd;
+        } else {
+            // Adiciona novo item
+            carrinho.push({
+                id: produtoAtual.id,
+                nome: produtoAtual.nome,
+                preco: produtoAtual.preco_venda,
+                qtd: quantidade,
+                subtotal: produtoAtual.preco_venda * quantidade,
+                estoque_atual: produtoAtual.estoque_atual
+            });
+        }
+        
+        renderizarCarrinho();
+        limparFormularioProduto();
+    }
+    
+    /**
+     * Redesenha a tabela do carrinho e os totais
+     */
+    function renderizarCarrinho() {
+        carrinhoTbody.innerHTML = ''; // Limpa a tabela
+        
+        let totalVenda = 0;
+        let totalItens = 0;
+
+        carrinho.forEach((item, index) => {
+            totalVenda += item.subtotal;
+            totalItens += item.qtd;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong class="text-secondary">${index + 1}</strong></td>
+                <td class="fw-bold text-white">${item.nome}</td>
+                <td>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-glass px-2 py-0 fs-5" onclick="alterarQuantidadeItem(${item.id}, -1)" title="Diminuir unidade">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <span class="badge badge-glass-secondary fs-5 px-3 py-1">${item.qtd}</span>
+                        <button class="btn btn-sm btn-glass px-2 py-0 fs-5" onclick="alterarQuantidadeItem(${item.id}, 1)" title="Aumentar unidade">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </td>
+                <td class="text-secondary">R$ ${item.preco.toFixed(2)}</td>
+                <td class="fw-bold" style="color: #6ee7b7;">R$ ${item.subtotal.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-glass px-3" style="color: #fca5a5; border-color: rgba(239, 68, 68, 0.4);" onclick="removerItemCarrinho(${item.id})" title="Remover item">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            carrinhoTbody.appendChild(tr);
+        });
+
+        // Atualiza os totais
+        totalItensSpan.textContent = totalItens;
+        totalVendaSpan.textContent = `R$ ${totalVenda.toFixed(2)}`;
+        
+        // Atualiza o modal
+        modalTotalVenda.textContent = `R$ ${totalVenda.toFixed(2)}`;
+        
+        // Habilita/desabilita botão de finalizar
+        btnFinalizar.disabled = carrinho.length === 0;
+    }
+    
+    /**
+     * Altera a quantidade de um item diretamente no carrinho (diminuir)
+     */
+    window.alterarQuantidadeItem = function(produtoId, delta) {
+        const item = carrinho.find(i => i.id === produtoId);
+        if (!item) return;
+
+        const novaQtd = item.qtd + delta;
+
+        if (novaQtd <= 0) {
+            if (confirm('Deseja remover o item do carrinho?')) {
+                removerItemCarrinho(produtoId);
+            }
+            return;
+        }
+
+        // Verifica o estoque (se houver a propriedade armazenada localmente)
+        if (delta > 0 && item.estoque_atual !== undefined && novaQtd > item.estoque_atual) {
+            alert(`Estoque insuficiente! Você só pode adicionar até ${item.estoque_atual} unidade(s) deste produto.`);
+            return;
+        }
+
+        item.qtd = novaQtd;
+        item.subtotal = item.preco * item.qtd;
+        renderizarCarrinho();
+    }
+    
+    /**
+     * Remove um item do carrinho
+     */
+    window.removerItemCarrinho = function(produtoId) {
+        carrinho = carrinho.filter(item => item.id !== produtoId);
+        renderizarCarrinho();
+    }
+    
+    /**
+     * Limpa o formulário de busca de produto
+     */
+    function limparFormularioProduto() {
+        produtoAtual = null;
+        inputCodigoBarras.value = '';
+        inputQuantidade.value = '1';
+        infoProdutoDiv.innerHTML = '<p class="text-muted">Aguardando produto...</p>';
+        inputCodigoBarras.focus();
+    }
+    
+    /**
+     * Limpa toda a venda
+     */
+    function cancelarVenda() {
+        if (carrinho.length > 0 && confirm('Tem certeza que deseja cancelar a venda atual?')) {
+            carrinho = [];
+            orcamentoCarregadoId = null;
+            document.getElementById('badge-orcamento').classList.add('d-none');
+            renderizarCarrinho();
+            limparFormularioProduto();
+        }
+    }
+    
+    /**
+     * Lógica do modal de finalização (FUNÇÃO ATUALIZADA COM PIX)
+     */
+    function atualizarModalPagamento() {
+        const totalVenda = parseFloat(carrinho.reduce((acc, item) => acc + item.subtotal, 0));
+        const valorPago = parseFloat(inputValorPago.value) || 0;
+        
+        let troco = 0;
+        
+        // Atualiza o valor total no modal (para ambos os lados)
+        modalTotalVenda.textContent = `R$ ${totalVenda.toFixed(2)}`; // ATUALIZADO
+        modalTotalPix.textContent = totalVenda.toFixed(2);
+        
+        // Esconde todos
+        campoValorPago.style.display = 'none';
+        campoPixQrcode.style.display = 'none';
+        camposMultiplo.style.display = 'none';
+        
+        // Verifica a forma de pagamento selecionada
+        if (selectFormaPagamento.value === 'dinheiro') {
+            campoValorPago.style.display = 'block'; // Mostra campo "Valor Pago"
+            if (valorPago > 0) {
+                 troco = valorPago - totalVenda;
+            }
+        
+        } else if (selectFormaPagamento.value === 'pix') {
+            campoPixQrcode.style.display = 'block'; // Mostra campo "QR Code"
+            inputValorPago.value = totalVenda.toFixed(2);
+            troco = 0;
+            
+        } else if (selectFormaPagamento.value === 'multiplo') {
+            camposMultiplo.style.display = 'block'; // Mostra campos múltiplos
+            const valDin = parseFloat(inputValorMultiploDinheiro.value) || 0;
+            const valCar = parseFloat(inputValorMultiploCartao.value) || 0;
+            const valPix = parseFloat(inputValorMultiploPix.value) || 0;
+            const somaMultiplo = valDin + valCar + valPix;
+            if (somaMultiplo > 0) {
+                 troco = somaMultiplo - totalVenda;
+            }
+        
+        } else {
+            // 'cartao' ou outro
+            inputValorPago.value = totalVenda.toFixed(2);
+            troco = 0;
+        }
+        
+        modalTroco.textContent = `R$ ${troco.toFixed(2)}`;
+        
+        if (troco < 0) {
+            modalTroco.classList.add('text-danger');
+            modalTroco.classList.remove('text-primary');
+        } else {
+            modalTroco.classList.remove('text-danger');
+            modalTroco.classList.add('text-primary');
+        }
+    }
+    
+    /**
+     * Envia os dados da venda para o backend
+     */
+    async function finalizarVenda() {
+        const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
+        const formaPagamento = selectFormaPagamento.value;
+        let valorPago = parseFloat(inputValorPago.value) || 0;
+        
+        let valorDinheiro = 0;
+        let valorCartao = 0;
+        let valorPix = 0;
+
+        if (formaPagamento === 'dinheiro') {
+            valorDinheiro = valorPago;
+            if (valorPago < totalVenda) {
+                alert('Valor pago é menor que o total da venda.');
+                return;
+            }
+        } else if (formaPagamento === 'cartao') {
+            valorCartao = totalVenda;
+            valorPago = totalVenda;
+        } else if (formaPagamento === 'pix') {
+            valorPix = totalVenda;
+            valorPago = totalVenda;
+        } else if (formaPagamento === 'multiplo') {
+            valorDinheiro = parseFloat(inputValorMultiploDinheiro.value) || 0;
+            valorCartao = parseFloat(inputValorMultiploCartao.value) || 0;
+            valorPix = parseFloat(inputValorMultiploPix.value) || 0;
+            valorPago = valorDinheiro + valorCartao + valorPix;
+            
+            if (valorPago < totalVenda) {
+                alert('A soma dos múltiplos valores é menor que o total da venda.');
+                return;
+            }
+            if (valorPago > totalVenda) {
+                const troco = valorPago - totalVenda;
+                if (troco > valorDinheiro) {
+                    alert('O troco não pode ser maior que o valor pago em dinheiro!');
+                    return;
+                }
+            }
+        }
+
+        // Prepara os dados para enviar
+        const dadosVenda = {
+            itens: carrinho.map(item => ({ id: item.id, quantidade: item.qtd })),
+            forma_pagamento: formaPagamento,
+            valor_pago: valorPago,
+            valor_dinheiro: valorDinheiro,
+            valor_cartao: valorCartao,
+            valor_pix: valorPix,
+            orcamento_origem_id: orcamentoCarregadoId
+        };
+        
+        btnConfirmarVenda.disabled = true;
+        btnConfirmarVenda.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+
+        try {
+            const response = await fetch('/vendas/finalizar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(dadosVenda)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro desconhecido');
+            }
+
+            const result = await response.json();
+            
+            // Abrir o cupom em nova janela
+            window.open('/venda/cupom/' + result.venda_id, '_blank', 'width=500,height=700');
+            
+            // Limpa tudo
+            carrinho = [];
+            orcamentoCarregadoId = null;
+            document.getElementById('badge-orcamento').classList.add('d-none');
+            renderizarCarrinho();
+            limparFormularioProduto();
+            modalFinalizarVenda.hide(); // CORRIGIDO
+
+        } catch (error) {
+            console.error('Erro ao finalizar venda:', error);
+            alert(`Erro: ${error.message}`);
+        } finally {
+            btnConfirmarVenda.disabled = false;
+            btnConfirmarVenda.innerHTML = '<i class="fas fa-save"></i> Confirmar Venda';
+        }
+    }
+
+    /**
+     * Envia os dados do carrinho para gerar um orçamento
+     */
+    async function gerarOrcamento() {
+        if (carrinho.length === 0) {
+            alert('Adicione itens ao carrinho antes de gerar um orçamento.');
+            return;
+        }
+
+        const dadosOrcamento = {
+            itens: carrinho.map(item => ({ id: item.id, quantidade: item.qtd }))
+        };
+        
+        btnOrcamento.disabled = true;
+        btnOrcamento.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+
+        try {
+            const response = await fetch('/vendas/orcamento', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(dadosOrcamento)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro desconhecido');
+            }
+
+            const result = await response.json();
+            
+            // Abrir o cupom de orçamento em nova janela
+            window.open('/venda/cupom_orcamento/' + result.orcamento_id, '_blank', 'width=500,height=700');
+            
+            // Limpa tudo
+            carrinho = [];
+            orcamentoCarregadoId = null;
+            document.getElementById('badge-orcamento').classList.add('d-none');
+            renderizarCarrinho();
+            limparFormularioProduto();
+
+        } catch (error) {
+            console.error('Erro ao gerar orçamento:', error);
+            alert(`Erro: ${error.message}`);
+        } finally {
+            btnOrcamento.disabled = false;
+            btnOrcamento.innerHTML = '<i class="fas fa-file-invoice-dollar"></i> Gerar Orçamento (F4)';
+        }
+    }
+
+    /**
+     * Busca os orçamentos pendentes do backend
+     */
+    async function buscarOrcamentosPendentes() {
+        const tbody = document.getElementById('lista-orcamentos-body');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center"><i class="fas fa-spinner fa-spin"></i> Carregando...</td></tr>';
+        
+        try {
+            const response = await fetch('/api/orcamentos_pendentes');
+            if (!response.ok) throw new Error('Erro ao buscar orçamentos');
+            
+            const orcamentos = await response.json();
+            
+            if (orcamentos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum orçamento pendente encontrado.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            orcamentos.forEach(orc => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${orc.numero}</strong></td>
+                    <td>${orc.data}</td>
+                    <td>${orc.operador}</td>
+                    <td>R$ ${orc.total.toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="carregarOrcamento(${orc.id}, '${orc.numero}')">
+                            <i class="fas fa-download"></i> Carregar
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+        } catch (error) {
+            console.error(error);
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Erro ao carregar orçamentos.</td></tr>';
+        }
+    }
+
+    /**
+     * Carrega os itens de um orçamento para o carrinho do PDV
+     */
+    window.carregarOrcamento = async function(id, numero) {
+        if (carrinho.length > 0) {
+            if (!confirm('O carrinho atual não está vazio. Deseja substituí-lo pelos itens deste orçamento?')) {
+                return;
+            }
+        }
+        
+        try {
+            const response = await fetch('/api/orcamento/' + id);
+            if (!response.ok) throw new Error('Erro ao carregar orçamento');
+            
+            const dados = await response.json();
+            
+            // Substitui o carrinho
+            carrinho = dados.itens.map(item => ({
+                id: item.id,
+                nome: item.nome,
+                preco: item.preco_venda,
+                qtd: item.quantidade,
+                subtotal: item.subtotal
+            }));
+            
+            // Define a variável global
+            orcamentoCarregadoId = dados.id;
+            
+            // Atualiza interface
+            const badge = document.getElementById('badge-orcamento');
+            badge.textContent = 'Orçamento Carregado: ' + dados.numero;
+            badge.classList.remove('d-none');
+            
+            renderizarCarrinho();
+            
+            // Esconde modal
+            bootstrap.Modal.getInstance(document.getElementById('modalBuscarOrcamento')).hide();
+            
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao carregar os itens do orçamento.');
+        }
+    };
+
+    // =========================================================================
+    //           INÍCIO DAS NOVAS FUNÇÕES (BUSCA POR NOME)
+    // =========================================================================
+
+    /**
+     * Busca produtos por nome na nova API
+     */
+    async function buscarProdutoPorNome() {
+        const termo = inputBuscaNome.value;
+
+        if (termo.length < 2) {
+            listaResultadosBusca.innerHTML = '<p class="text-center text-muted">Aguardando digitação (mín. 2 caracteres)...</p>';
+            return;
+        }
+
+        listaResultadosBusca.innerHTML = '<p class="text-center text-primary"><i class="fas fa-spinner fa-spin"></i> Buscando...</p>';
+
+        try {
+            // Chama a nova API criada no app.py
+            const response = await fetch(`/api/produtos/buscar?nome=${termo}`);
+            if (!response.ok) {
+                throw new Error('Erro ao buscar produtos');
+            }
+            const produtos = await response.json();
+            renderizarResultadosBusca(produtos);
+        } catch (error) {
+            console.error('Erro na busca por nome:', error);
+            listaResultadosBusca.innerHTML = '<p class="text-center text-danger">Erro ao buscar produtos.</p>';
+        }
+    }
+
+    /**
+     * Renderiza os resultados da busca por nome no modal
+     */
+    function renderizarResultadosBusca(produtos) {
+        listaResultadosBusca.innerHTML = ''; // Limpa a lista
+
+        if (produtos.length === 0) {
+            listaResultadosBusca.innerHTML = '<p class="text-center text-warning">Nenhum produto encontrado.</p>';
+            return;
+        }
+
+        const ul = document.createElement('ul');
+        ul.className = 'list-group';
+
+        produtos.forEach(produto => {
+            const li = document.createElement('a'); // Usamos <a> para ser clicável
+            li.href = "#";
+            li.className = 'list-group-item list-group-item-action resultado-item-busca d-flex justify-content-between align-items-center';
+            
+            // Armazena todos os dados do produto no próprio elemento
+            li.dataset.produtoJson = JSON.stringify(produto);
+            
+            // Imagem (ou ícone)
+            const imgHtml = produto.imagem_url
+                ? `<img src="${produto.imagem_url}" alt="${produto.nome}">`
+                : `<div class="d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; background: #eee; margin-right: 15px; border-radius: 5px;"><i class="fas fa-image text-muted"></i></div>`;
+
+            // Informações (Nome, Estoque)
+            const infoHtml = `
+                <div class="info">
+                    <span class="nome">${produto.nome}</span>
+                    <span class="detalhes">Cód: ${produto.codigo_barras} | Estoque: ${produto.estoque_atual}</span>
+                </div>
+            `;
+            
+            // Preço
+            const precoHtml = `<span class="preco">R$ ${produto.preco_venda.toFixed(2)}</span>`;
+
+            li.innerHTML = `
+                <div class="d-flex align-items-center">
+                    ${imgHtml}
+                    ${infoHtml}
+                </div>
+                ${precoHtml}
+            `;
+            
+            // Adiciona o evento de clique
+            li.addEventListener('click', selecionarProdutoDaBusca);
+            
+            ul.appendChild(li);
+        });
+        
+        listaResultadosBusca.appendChild(ul);
+    }
+
+    /**
+     * Ação ao clicar em um item da lista de busca
+     */
+    function selecionarProdutoDaBusca(e) {
+        e.preventDefault();
+        
+        // Pega os dados do produto que armazenamos no 'dataset'
+        const produto = JSON.parse(e.currentTarget.dataset.produtoJson);
+
+        // 1. Define o 'produtoAtual' (variável global)
+        // A função adicionarAoCarrinho usa 'produtoAtual'
+        produtoAtual = {
+            id: produto.id,
+            nome: produto.nome,
+            preco_venda: produto.preco_venda
+            // os outros campos não são necessários para adicionarAoCarrinho
+        };
+        
+        // 2. Chama a função de adicionar ao carrinho
+        // O input 'quantidade' (que está fora do modal) será usado (padrão 1)
+        adicionarAoCarrinho();
+        
+        // 3. Fecha o modal
+        modalBusca.hide();
+    }
+    
+    // =========================================================================
+    //           FIM DAS NOVAS FUNÇÕES
+    // =========================================================================
+
+
+    // =========================================================================
+    // EVENT LISTENERS
+    // =========================================================================
+
+    // Busca produto ao digitar (com delay)
+    let typingTimer;
+    inputCodigoBarras.addEventListener('keyup', (e) => {
+        clearTimeout(typingTimer);
+        // Se pressionar Enter, busca e tenta adicionar imediatamente
+        if (e.key === 'Enter') {
+            // Passa true para forçar a busca
+            buscarProduto(true).then(() => {
+                if(produtoAtual) {
+                    adicionarAoCarrinho();
+                }
+            });
+        } else {
+             // Caso contrário, espera o usuário parar de digitar
+             typingTimer = setTimeout(() => {
+                buscarProduto(false); 
+             }, 500); // 500ms delay
+        }
+    });
+    
+    // Adicionar com botão
+    btnAdicionar.addEventListener('click', adicionarAoCarrinho);
+    
+    // Adicionar com Enter no campo quantidade
+    inputQuantidade.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            adicionarAoCarrinho(); // CORRIGIDO (era adicionarAoVenda)
+        }
+    });
+    
+    // Botões de ação
+    btnCancelar.addEventListener('click', cancelarVenda);
+    btnConfirmarVenda.addEventListener('click', finalizarVenda);
+    if (btnOrcamento) {
+        btnOrcamento.addEventListener('click', gerarOrcamento);
+    }
+    
+    // Listeners do Modal
+    selectFormaPagamento.addEventListener('change', atualizarModalPagamento);
+    inputValorPago.addEventListener('input', atualizarModalPagamento);
+    inputValorMultiploDinheiro.addEventListener('input', atualizarModalPagamento);
+    inputValorMultiploCartao.addEventListener('input', atualizarModalPagamento);
+    inputValorMultiploPix.addEventListener('input', atualizarModalPagamento);
+    
+    // Atalhos do teclado (MODIFICADO)
+    document.addEventListener('keydown', (e) => {
+        
+        // ======================================================= //
+        //           INÍCIO DA NOVA LÓGICA (F2)                    //
+        // ======================================================= //
+        if (e.key === 'F2') {
+            e.preventDefault();
+            modalBusca.show();
+        }
+        // ======================================================= //
+        
+        if (e.key === 'F6') {
+            e.preventDefault();
+            if(carrinho.length > 0) {
+                atualizarModalPagamento(); 
+                modalFinalizarVenda.show(); // CORRIGIDO (era modal.show())
+            }
+        }
+        if (btnOrcamento && e.key === 'F4') {
+            e.preventDefault();
+            if(carrinho.length > 0) {
+                gerarOrcamento();
+            }
+        }
+        if (btnOrcamento && e.key === 'F8') {
+            e.preventDefault();
+            const modalOrc = new bootstrap.Modal(document.getElementById('modalBuscarOrcamento'));
+            modalOrc.show();
+        }
+        if (e.key === 'F3') {
+            e.preventDefault();
+            cancelarVenda();
+        }
+    });
+
+    // =========================================================================
+    //           INÍCIO DOS NOVOS LISTENERS (MODAL DE BUSCA)
+    // =========================================================================
+    
+    // Evento para carregar orçamentos ao abrir o modal
+    document.getElementById('modalBuscarOrcamento').addEventListener('shown.bs.modal', function () {
+        buscarOrcamentosPendentes();
+    });
+    
+    // Foca o input de busca quando o modal abrir
+    document.getElementById('modalBuscarProduto').addEventListener('shown.bs.modal', function () {
+        inputBuscaNome.focus();
+        inputBuscaNome.select();
+    });
+    
+    // Limpa o input de busca quando o modal fechar
+    document.getElementById('modalBuscarProduto').addEventListener('hidden.bs.modal', function () {
+        inputBuscaNome.value = '';
+        listaResultadosBusca.innerHTML = '<p class="text-center text-muted">Aguardando digitação (mín. 2 caracteres)...</p>';
+    });
+
+    // Evento de digitação no input de busca (com debounce)
+    inputBuscaNome.addEventListener('keyup', (e) => {
+        clearTimeout(buscaTypingTimer);
+        
+        // Se o usuário pressionar Enter na busca, não faz nada (ele deve clicar)
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            return;
+        }
+        
+        buscaTypingTimer = setTimeout(buscarProdutoPorNome, 300); // 300ms de espera
+    });
+    // =========================================================================
+    //           FIM DOS NOVOS LISTENERS
+    // =========================================================================
+
+    // Evento quando o Modal de Finalizar Venda é aberto para auto-preencher valores
+    document.getElementById('modalFinalizar').addEventListener('show.bs.modal', function () {
+        const totalVenda = parseFloat(carrinho.reduce((acc, item) => acc + item.subtotal, 0));
+        
+        // Auto-preenche os campos de pagamento com o total da compra
+        inputValorPago.value = totalVenda.toFixed(2);
+        inputValorMultiploDinheiro.value = totalVenda.toFixed(2);
+        inputValorMultiploCartao.value = '';
+        inputValorMultiploPix.value = '';
+        
+        // Garante que a interface reflita o preenchimento sem calcular troco negativo indevido
+        atualizarModalPagamento();
+    });
+
+    // Inicializa a tela
+    renderizarCarrinho();
+    limparFormularioProduto();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Abrir Caixa - Sistema de Caixa{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center pt-4 mt-5">
+    <div class="col-md-5">
+        <div class="glass-card shadow-lg" style="border-top: 4px solid #10b981;">
+            <div class="glass-card-header text-center pt-4 pb-3" style="background: rgba(0,0,0,0.15); border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <i class="fas fa-lock-open text-success fa-3x mb-3" style="filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.5));"></i>
+                <h3 class="fw-bold mb-0 text-white">Abrir Caixa</h3>
+            </div>
+            <div class="glass-card-body p-4">
+                <form method="POST">
+                    <div class="mb-4">
+                        <label for="saldo_inicial" class="form-label text-secondary fw-bold">Saldo Inicial (R$):</label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text border-0" style="background: rgba(0,0,0,0.3); color: #10b981;">
+                                <i class="fas fa-money-bill-wave"></i>
+                            </span>
+                            <input type="number" step="0.01" class="form-control glass-input fw-bold" id="saldo_inicial" 
+                                   name="saldo_inicial" value="0.00" required>
+                        </div>
+                        <div class="form-text mt-2 text-secondary opacity-75">
+                            <i class="fas fa-info-circle me-1"></i> Informe o valor em dinheiro já disponível na gaveta.
+                        </div>
+                    </div>
+                    
+                    <div class="p-3 rounded mb-4" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3);">
+                        <h6 class="text-info mb-3"><i class="fas fa-id-badge me-2"></i> Informações do Turno:</h6>
+                        <ul class="list-unstyled mb-0 ms-1 text-white">
+                            <li class="mb-2"><i class="fas fa-user text-secondary me-2"></i> Operador: <strong class="ms-1">{{ current_user.nome }}</strong></li>
+                            <li><i class="fas fa-clock text-secondary me-2"></i> Data/Hora: <strong class="ms-1">{{ now.strftime('%d/%m/%Y %H:%M') }}</strong></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="d-grid gap-3">
+                        <button type="submit" class="btn btn-glass-success btn-lg py-3 fw-bold shadow">
+                            <i class="fas fa-check-circle me-2"></i> Confirmar Abertura
+                        </button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-glass py-2">
+                            <i class="fas fa-times me-2"></i> Cancelar e Voltar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

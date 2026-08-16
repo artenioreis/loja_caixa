@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Fechamento de Caixa</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        /* ESTILOS COPIADOS DE cupom.html PARA GARANTIR A FORMATAÇÃO */
+        body {
+            background-color: #f4f4f4;
+        }
+        .cupom {
+            width: 380px; 
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border: 1px dashed #ccc;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            color: #000;
+        }
+        .cupom-header {
+            text-align: center;
+            border-bottom: 1px dashed #ccc;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .cupom-logo {
+            max-width: 200px;
+            max-height: 80px;
+            margin-bottom: 10px;
+        }
+        .cupom-header h5 {
+            margin: 0;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        .cupom-info { font-size: 0.85rem; }
+        .cupom-body th, .cupom-body td { padding: 2px 0; }
+        .col-desc { text-align: left; width: 60%;}
+        .col-val { text-align: right; width: 40%;}
+        .item-row .detalhe {
+            font-size: 0.8rem;
+            padding-left: 5px;
+        }
+        .cupom-total {
+            border-top: 1px dashed #ccc;
+            padding-top: 10px;
+            margin-top: 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .cupom-pagamento { font-size: 0.9rem; font-weight: normal; }
+        .cupom-footer { text-align: center; margin-top: 20px; font-size: 0.85rem; }
+        .no-print { text-align: center; margin-top: 20px; }
+
+        /* ESTILOS DE IMPRESSÃO (COPIADOS DE cupom.html) */
+        @media print {
+            @page {
+                size: auto; 
+                margin: 0mm;
+            }
+            .no-print { display: none; }
+            body, html {
+                margin: 0;
+                padding: 0;
+                background-color: #fff;
+                line-height: 1.2; 
+            }
+            .cupom {
+                width: 55mm;
+                margin: 0;
+                padding: 0; 
+                border: none;
+                box-shadow: none;
+                font-size: 9pt; 
+                font-family: 'Courier New', Courier, monospace; 
+                word-wrap: break-word; 
+                font-weight: bold; /* Texto em negrito para impressão */
+            }
+            .cupom-header, .cupom-body, .cupom-total, .cupom-footer {
+                 padding: 0 1mm;
+            }
+            .cupom-header { padding-bottom: 3px; margin-bottom: 3px; }
+            hr.my-1 {
+                margin-top: 3px !important;
+                margin-bottom: 3px !important;
+                border-top: 1px dashed #000;
+            }
+            .cupom-logo { max-width: 35mm; max-height: 25mm; margin-bottom: 5px; }
+            .cupom-header p, .cupom-header div { font-size: 8pt; line-height: 1.2; }
+            .cupom-header h5 { font-size: 9pt; font-weight: bold; margin-bottom: 3px; }
+            .cupom-body, .cupom-body table { font-size: 8pt; line-height: 1.2; }
+            .cupom-body table { width: 100%; }
+            .cupom-body th, .cupom-body td { padding: 1px 0; }
+            .col-desc { text-align: left; width: 60% !important; }
+            .col-val { text-align: right; width: 40% !important; } 
+            .cupom-total { font-size: 9pt; padding-top: 5px; margin-top: 5px; border-top: 1px dashed #000; }
+            .cupom-total span { line-height: 1.3; }
+            .cupom-pagamento { font-size: 8pt; margin-top: 2px; font-weight: bold; }
+            .cupom-footer { margin-top: 10px; font-size: 8pt; font-weight: bold; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="cupom">
+        <div class="cupom-header">
+            <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="cupom-logo">
+            <p class="mb-0">Paróquia Nossa Senhora das Graças,</p>
+            <p class="mb-0">Pirambu</p>
+            <p class="mb-0 fw-bold">RELATÓRIO DE FECHAMENTO</p>
+            <hr class="my-1">
+            <div class="cupom-info text-start">
+                <div><strong>Operador:</strong> {{ caixa.usuario.nome }}</div>
+                <div><strong>Abertura:</strong> {{ caixa.data_abertura.strftime('%d/%m/%Y %H:%M') }}</div>
+                <div><strong>Emissão:</strong> {{ now.strftime('%d/%m/%Y %H:%M') }}</div>
+                </div>
+        </div>
+
+        <div class="cupom-body">
+            <table class="table table-borderless table-sm" style="font-family: 'Courier New', Courier, monospace;">
+                <thead>
+                    <tr>
+                        <th class="col-desc">DESCRIÇÃO</th>
+                        <th class="col-val">VALOR (R$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="item-row">
+                        <td class="col-desc fw-bold">RESUMO DE VENDAS</td>
+                        <td class="col-val"></td>
+                    </tr>
+                    <tr class="item-row">
+                        <td class="col-desc detalhe">Vendas (Dinheiro)</td>
+                        <td class="col-val fw-bold">{{ "%.2f"|format(totais.dinheiro) }}</td>
+                    </tr>
+                    <tr class="item-row">
+                        <td class="col-desc detalhe">Vendas (Cartão)</td>
+                        <td class="col-val fw-bold">{{ "%.2f"|format(totais.cartao) }}</td>
+                    </tr>
+                    <tr class="item-row">
+                        <td class="col-desc detalhe">Vendas (PIX)</td>
+                        <td class="col-val fw-bold">{{ "%.2f"|format(totais.pix) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cupom-total">
+            <div class="d-flex justify-content-between">
+                <span>TOTAL DE VENDAS</span>
+                <span>R$ {{ "%.2f"|format(totais.total_geral) }}</span>
+            </div>
+            <div class="d-flex justify-content-between" style="font-size: 0.9rem; font-weight: normal;">
+                <span>(Nº de Vendas: {{ totais.total_vendas_count }})</span>
+                <span></span>
+            </div>
+            
+            <hr class="my-1">
+
+            <div class="d-flex justify-content-between mt-2">
+                <span>SALDO INICIAL</span>
+                <span>R$ {{ "%.2f"|format(caixa.saldo_inicial) }}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>+ VENDAS (Dinheiro)</span>
+                <span>R$ {{ "%.2f"|format(totais.dinheiro) }}</span>
+            </div>
+            <div class="d-flex justify-content-between fw-bold mt-1" style="border-top: 1px solid #000;">
+                <span>= ESPERADO (Dinheiro)</span>
+                <span>R$ {{ "%.2f"|format(saldo_esperado_dinheiro) }}</span>
+            </div>
+        </div>
+        
+        <div class="cupom-footer">
+            <p>Confira os valores.</p>
+        </div>
+    </div>
+
+    <div class="no-print container" style="width: 380px;">
+        <button onclick="window.print()" class="btn btn-primary w-100">
+            <i class="fas fa-print"></i> Imprimir Relatório
+        </button>
+        <button onclick="window.close()" class="btn btn-secondary w-100 mt-2">
+            Fechar Janela
+        </button>
+    </div>
+
+</body>
+</html>

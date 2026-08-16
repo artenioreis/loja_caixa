@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if usuario %}Editar Usuário{% else %}Novo Usuário{% endif %} - Sistema de Caixa
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header {% if usuario %}bg-primary text-white{% else %}bg-success text-white{% endif %}">
+                <h4>
+                    {% if usuario %}
+                        <i class="fas fa-edit"></i> Editar Usuário: {{ usuario.nome }}
+                    {% else %}
+                        <i class="fas fa-plus"></i> Novo Usuário
+                    {% endif %}
+                </h4>
+            </div>
+            <div class="card-body">
+                <!-- Se o formulário for de edição, a action aponta para a rota de edição -->
+                <!-- Se for novo, a action aponta para a rota de novo -->
+                <form method="POST" action="{% if usuario %}{{ url_for('usuarios_editar', id=usuario.id) }}{% else %}{{ url_for('usuarios_novo') }}{% endif %}">
+                    
+                    <!-- Nome -->
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Nome Completo:</label>
+                        <input type="text" class="form-control" id="nome" name="nome" 
+                               value="{{ (usuario.nome if usuario else nome) or '' }}" required>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email:</label>
+                        <input type="email" class="form-control" id="email" name="email"
+                               value="{{ (usuario.email if usuario else email) or '' }}" required>
+                    </div>
+
+                    <!-- Perfil -->
+                    <div class="mb-3">
+                        <label for="perfil" class="form-label">Perfil de Acesso:</label>
+                        <select class="form-select" id="perfil" name="perfil" required>
+                            <option value="caixa" {% if usuario and usuario.perfil == 'caixa' %}selected{% endif %}>
+                                Caixa
+                            </option>
+                            <option value="admin" {% if usuario and usuario.perfil == 'admin' %}selected{% endif %}>
+                                Administrador
+                            </option>
+                        </select>
+                    </div>
+                    
+                    <!-- Senha -->
+                    <div class="mb-3">
+                        <label for="senha" class="form-label">Senha:</label>
+                        <input type="password" class="form-control" id="senha" name="senha"
+                               {% if not usuario %}required{% endif %}>
+                        <div class="form-text">
+                            {% if usuario %}
+                                Deixe em branco para manter a senha atual.
+                            {% else %}
+                                Senha obrigatória para novo usuário.
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('usuarios') }}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn {% if usuario %}btn-primary{% else %}btn-success{% endif %}">
+                            <i class="fas fa-save"></i> 
+                            {% if usuario %}Salvar Alterações{% else %}Criar Usuário{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

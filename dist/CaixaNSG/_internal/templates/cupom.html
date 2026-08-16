@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cupom Venda #{{ venda.numero_venda }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #f4f4f4;
+        }
+        /* ESTILO PARA VISUALIZAÇÃO EM TELA (NÃO AFETA IMPRESSÃO) */
+        .cupom {
+            width: 380px; /* Largura de cupom térmico (VISUALIZAÇÃO) */
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border: 1px dashed #ccc;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            color: #000;
+        }
+        .cupom-header {
+            text-align: center;
+            border-bottom: 1px dashed #ccc;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .cupom-logo {
+            max-width: 200px;
+            max-height: 80px;
+            margin-bottom: 10px;
+        }
+
+        .cupom-header h5 {
+            margin: 0;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        .cupom-info {
+            font-size: 0.85rem;
+        }
+        
+        .cupom-body th, .cupom-body td {
+            padding: 2px 0;
+        }
+        /* Alinhamentos da tabela de itens - Visualização */
+        .col-produto { text-align: left; width: 55%;}
+        .col-qtd { text-align: center; }
+        .col-vl { text-align: right; }
+        .col-sub { text-align: right; width: 25%;}
+
+        .item-row .nome-produto {
+            font-weight: bold;
+        }
+        .item-row .detalhes {
+            font-size: 0.8rem;
+            padding-left: 5px;
+        }
+
+        .cupom-total {
+            border-top: 1px dashed #ccc;
+            padding-top: 10px;
+            margin-top: 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .cupom-pagamento {
+            font-size: 0.9rem;
+            font-weight: normal;
+        }
+        
+        .cupom-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.85rem;
+        }
+        .no-print {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        /* ================================================= */
+        /* INÍCIO DA CORREÇÃO DE IMPRESSÃO (57mm / 58mm)   */
+        /* ================================================= */
+        @media print {
+            
+            @page {
+                size: auto; 
+                margin: 0mm; /* Garante que a impressora não adicione margens */
+            }
+
+            .no-print {
+                display: none;
+            }
+            
+            body, html {
+                margin: 0;
+                padding: 0;
+                background-color: #fff;
+                line-height: 1.2; 
+            }
+            
+            .cupom {
+                width: 55mm; /* Largura ajustada para 55mm (folga de 1.5mm de cada lado) */
+                margin: 0;
+                padding: 0; 
+                border: none;
+                box-shadow: none;
+                
+                /* ======================================== */
+                /* AJUSTE SOLICITADO (FONTE MAIOR E GROSSA) */
+                /* ======================================== */
+                font-size: 10pt; /* Aumentado de 9pt para 10pt */
+                font-family: 'Courier New', Courier, monospace; 
+                word-wrap: break-word; 
+                font-weight: bold; /* Força todo o texto do cupom a ser negrito */
+            }
+            
+            /* Ajusta padding interno para todos os blocos do cupom */
+            .cupom-header, .cupom-body, .cupom-total, .cupom-footer {
+                 padding: 0 1mm; /* Padding lateral mínimo de 1mm */
+            }
+            
+            .cupom-header {
+                padding-bottom: 3px;
+                margin-bottom: 3px;
+            }
+
+            /* Linhas horizontais (hr) */
+            hr.my-1 {
+                margin-top: 3px !important;
+                margin-bottom: 3px !important;
+                border-top: 1px dashed #000;
+            }
+            
+            /* Reduz o logo para caber na largura do cupom */
+            .cupom-logo {
+                max-width: 35mm; /* Logo com 3.5cm (menor) */
+                max-height: 25mm; /* Altura máxima */
+                margin-bottom: 5px;
+            }
+
+            .cupom-header p, .cupom-header div {
+                font-size: 9pt; /* Aumentado de 8pt para 9pt */
+                line-height: 1.2;
+            }
+            .cupom-header h5 { /* Título "CUPOM NÃO FISCAL" */
+                font-size: 10pt; /* Aumentado de 9pt para 10pt */
+                font-weight: bold;
+                margin-bottom: 3px;
+            }
+
+            /* Reduz o tamanho da fonte e paddings dos itens da tabela */
+            .cupom-body, .cupom-body table {
+                font-size: 9pt; /* Aumentado de 8pt para 9pt */
+                line-height: 1.2;
+            }
+            
+            .cupom-body table {
+                width: 100%;
+            }
+
+            .cupom-body th, .cupom-body td {
+                padding: 1px 0; /* Padding mínimo na tabela */
+            }
+
+            /* Força o alinhamento e larguras da tabela de itens para 55mm */
+            /* Diminui produto, aumenta subtotal */
+            .col-produto { text-align: left; width: 40% !important; } 
+            .col-qtd { text-align: center; width: 10% !important; }
+            .col-vl { text-align: right; width: 25% !important; }
+            .col-sub { text-align: right; width: 25% !important; } 
+            
+            .cupom-total {
+                font-size: 10pt; /* Aumentado de 9pt para 10pt */
+                padding-top: 5px;
+                margin-top: 5px;
+                border-top: 1px dashed #000;
+            }
+            .cupom-total span {
+                line-height: 1.3;
+            }
+            
+            /* ======================================================= */
+            /* AJUSTE SOLICITADO (Garantir Negrito no Pagamento)     */
+            /* ======================================================= */
+            .cupom-pagamento {
+                font-size: 9pt; /* Aumentado de 8pt para 9pt */
+                margin-top: 2px;
+                font-weight: bold; /* Garante negrito na impressão */
+            }
+            
+            .cupom-footer {
+                margin-top: 10px;
+                font-size: 9pt; /* Aumentado de 8pt para 9pt */
+                font-weight: bold; /* Garante negrito na impressão */
+            }
+            /* ======================================================= */
+            /* FIM DO AJUSTE                                         */
+            /* ======================================================= */
+        }
+        /* ================================================= */
+        /* FIM DA CORREÇÃO DE IMPRESSÃO                    */
+        /* ================================================= */
+    </style>
+</head>
+<body>
+
+    <div class="cupom">
+        <div class="cupom-header">
+            
+            <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="cupom-logo">
+            <p class="mb-0">Paróquia Nossa Senhora das Graças,</p>
+            <p class="mb-0">Pirambu</p>
+            <p class="mb-0">Rua Nossa Senhora das Graças, 255</p>
+            <p class="mb-0">CNPJ: 07.210.925/0014-20</p>
+            <p class="mb-0 fw-bold">CUPOM NÃO FISCAL</p>
+            <hr class="my-1">
+            <div class="cupom-info text-start">
+                <div><strong>Venda:</strong> #{{ venda.numero_venda }}</div>
+                <div><strong>Data:</strong> {{ venda.data_venda.strftime('%d/%m/%Y %H:%M:%S') }}</div>
+                <div><strong>Operador:</strong> {{ venda.operador.nome }}</div>
+            </div>
+        </div>
+
+        <div class="cupom-body">
+            <table class="table table-borderless table-sm" style="font-family: 'Courier New', Courier, monospace;">
+                <thead>
+                    <tr>
+                        <th class="col-produto">PRODUTO</th>
+                        <th class="col-qtd">QTD</th>
+                        <th class="col-vl">VL.UN</th>
+                        <th class="col-sub">SUBTOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in venda.itens %}
+                    <tr class="item-row">
+                        <td class="col-produto nome-produto">{{ item.produto.nome }}</td>
+                        <td class="col-qtd fw-bold">{{ item.quantidade }}</td>
+                        <td class="col-vl">{{ "%.2f"|format(item.preco_unitario) }}</td>
+                        <td class="col-sub fw-bold">R$ {{ "%.2f"|format(item.subtotal) }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="cupom-total">
+            <div class="d-flex justify-content-between">
+                <span>TOTAL</span>
+                <span>R$ {{ "%.2f"|format(venda.valor_total) }}</span>
+            </div>
+            
+            <div class="cupom-pagamento mt-2">
+                <div class="d-flex justify-content-between">
+                    <span>Forma Pgto:</span>
+                    <span>{{ venda.forma_pagamento|title }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Valor Pago:</span>
+                    <span>R$ {{ "%.2f"|format(venda.valor_pago) }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Troco:</span>
+                    <span>R$ {{ "%.2f"|format(venda.troco) }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="cupom-footer">
+            <p>Obrigado e volte sempre!</p>
+        </div>
+    </div>
+
+    <div class="no-print container" style="width: 380px;">
+        <button onclick="window.print()" class="btn btn-primary w-100">
+            <i class="fas fa-print"></i> Imprimir Cupom
+        </button>
+        <button onclick="window.close()" class="btn btn-secondary w-100 mt-2">
+            Fechar Janela
+        </button>
+    </div>
+
+</body>
+</html>
