@@ -109,10 +109,12 @@
 
     <div class="cupom">
         <div class="cupom-header">
-            <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="cupom-logo">
-            <p class="mb-0">Paróquia Nossa Senhora das Graças,</p>
-            <p class="mb-0">Pirambu</p>
-            <p class="mb-0 fw-bold">RELATÓRIO DE FECHAMENTO</p>
+            {% if logo_empresa %}
+            <img src="{{ url_for('static', filename=logo_empresa) }}" alt="Logo da Empresa" class="cupom-logo">
+            {% endif %}
+            {% if cupom_linha1 %}<p class="mb-0">{{ cupom_linha1 }}</p>{% endif %}
+            {% if cupom_linha2 %}<p class="mb-0">{{ cupom_linha2 }}</p>{% endif %}
+            <p class="mb-0 fw-bold mt-1">RELATÓRIO DE FECHAMENTO</p>
             <hr class="my-1">
             <div class="cupom-info text-start">
                 <div><strong>Operador:</strong> {{ caixa.usuario.nome }}</div>

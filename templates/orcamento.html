@@ -198,11 +198,13 @@
     <div class="cupom">
         <div class="cupom-header">
             
-            <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="cupom-logo">
-            <p class="mb-0">Paróquia Nossa Senhora das Graças,</p>
-            <p class="mb-0">Pirambu</p>
-            <p class="mb-0">Rua Nossa Senhora das Graças, 255</p>
-            <p class="mb-0">CNPJ: 07.210.925/0014-20</p>
+            {% if logo_empresa %}
+            <img src="{{ url_for('static', filename=logo_empresa) }}" alt="Logo da Empresa" class="cupom-logo">
+            {% endif %}
+            {% if cupom_linha1 %}<p class="mb-0">{{ cupom_linha1 }}</p>{% endif %}
+            {% if cupom_linha2 %}<p class="mb-0">{{ cupom_linha2 }}</p>{% endif %}
+            {% if cupom_linha3 %}<p class="mb-0">{{ cupom_linha3 }}</p>{% endif %}
+            {% if cupom_linha4 %}<p class="mb-0">{{ cupom_linha4 }}</p>{% endif %}
             <hr class="my-1">
             <h5 class="mt-2 mb-2">ORÇAMENTO</h5>
             <p class="mb-0 fw-bold">SEM VALOR FISCAL</p>

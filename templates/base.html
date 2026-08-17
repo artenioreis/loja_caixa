@@ -444,7 +444,7 @@
                 <div class="position-sticky pt-3 h-100 d-flex flex-column">
                     
                     <div class="sidebar-logo-container">
-                        <img src="{{ url_for('static', filename='images/logo_empresa.png') }}" alt="Logo da Empresa" class="sidebar-logo">
+                        <img src="{{ url_for('static', filename=logo_empresa) }}" alt="Logo da Empresa" class="sidebar-logo">
                     </div>
                     <h5 class="text-white text-center mb-4 mt-3" style="font-weight: 600; letter-spacing: 0.5px;"> 
                         <i class="fas fa-cash-register text-primary me-2"></i> PDV System
@@ -481,6 +481,11 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('extrato_estoque') }}">
                                 <i class="fas fa-list-alt"></i> Extrato de Estoque
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('configuracoes') }}">
+                                <i class="fas fa-cogs"></i> Configurações
                             </a>
                         </li>
                         {% endif %}

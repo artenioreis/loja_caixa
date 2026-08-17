@@ -221,11 +221,24 @@ def inject_context():
     # ===========================================================
     # Voltando para datetime.now() para usar a HORA LOCAL
     orcamento_ativo = get_config('orcamento_ativo', 'True') == 'True'
+    
+    # Configurações dinâmicas de Logo e Cupom
+    logo_empresa = get_config('logo_empresa', 'images/logo_empresa.png')
+    cupom_linha1 = get_config('cupom_linha1', 'Paróquia Nossa Senhora das Graças,')
+    cupom_linha2 = get_config('cupom_linha2', 'Pirambu')
+    cupom_linha3 = get_config('cupom_linha3', 'Rua Nossa Senhora das Graças, 255')
+    cupom_linha4 = get_config('cupom_linha4', 'CNPJ: 07.210.925/0014-20')
+    
     return dict(
         caixa_aberto=caixa_aberto,
         movimento_atual=movimento_atual,
         now=datetime.now(), # <-- CORRIGIDO
-        orcamento_ativo=orcamento_ativo
+        orcamento_ativo=orcamento_ativo,
+        logo_empresa=logo_empresa,
+        cupom_linha1=cupom_linha1,
+        cupom_linha2=cupom_linha2,
+        cupom_linha3=cupom_linha3,
+        cupom_linha4=cupom_linha4
     )
     # ===========================================================
 
@@ -377,6 +390,56 @@ def toggle_orcamento():
     status_texto = "Ativado" if novo_valor == 'True' else "Desativado"
     flash(f'Módulo de Orçamento {status_texto} com sucesso!', 'success')
     return redirect(url_for('dashboard'))
+
+@app.route('/configuracoes', methods=['GET', 'POST'])
+@login_required
+def configuracoes():
+    """Rota para configurações gerais do sistema (Apenas Admin)"""
+    if not current_user.is_admin():
+        flash('Acesso não autorizado!', 'danger')
+        return redirect(url_for('vendas'))
+        
+    if request.method == 'POST':
+        cupom_linha1 = request.form.get('cupom_linha1', '').strip()
+        cupom_linha2 = request.form.get('cupom_linha2', '').strip()
+        cupom_linha3 = request.form.get('cupom_linha3', '').strip()
+        cupom_linha4 = request.form.get('cupom_linha4', '').strip()
+        
+        set_config('cupom_linha1', cupom_linha1)
+        set_config('cupom_linha2', cupom_linha2)
+        set_config('cupom_linha3', cupom_linha3)
+        set_config('cupom_linha4', cupom_linha4)
+        
+        # Lógica de Upload do Logo da Empresa
+        if 'logo_file' in request.files:
+            file = request.files['logo_file']
+            if file and file.filename != '':
+                ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+                if ext in {'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico'}:
+                    logo_dir = os.path.join(app.root_path, 'static/images')
+                    os.makedirs(logo_dir, exist_ok=True)
+                    
+                    timestamp = int(datetime.now().timestamp())
+                    filename = f"logo_config_{timestamp}.{ext}"
+                    file_path = os.path.join(logo_dir, filename)
+                    
+                    # Remover logos customizados antigos
+                    for existing_file in os.listdir(logo_dir):
+                        if existing_file.startswith('logo_config_'):
+                            try:
+                                os.remove(os.path.join(logo_dir, existing_file))
+                            except Exception:
+                                pass
+                                
+                    file.save(file_path)
+                    set_config('logo_empresa', f"images/{filename}")
+                else:
+                    flash('Extensão de imagem para o logo não permitida. Use PNG, JPG, JPEG, WEBP, GIF ou ICO.', 'danger')
+                    
+        flash('Configurações atualizadas com sucesso!', 'success')
+        return redirect(url_for('configuracoes'))
+        
+    return render_template('configuracoes.html')
 
 # =============================================================================
 # ROTAS DO MÓDULO DE CAIXA
