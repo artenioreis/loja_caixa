@@ -325,13 +325,13 @@
         /* LIGHT THEME                                       */
         /* ================================================= */
         html[data-theme="light"] body {
-            background: linear-gradient(135deg, #e8eef5 0%, #f4f7fb 100%) !important;
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important;
             background-image: none !important;
             background-attachment: initial !important;
             color: #1e293b !important;
         }
         html[data-theme="light"] .body-overlay {
-            background: rgba(240,244,248,0.3) !important;
+            background: rgba(255, 255, 255, 0.4) !important;
             backdrop-filter: none !important;
             -webkit-backdrop-filter: none !important;
         }
@@ -340,9 +340,70 @@
             background: #ffffff !important;
             backdrop-filter: none !important;
             border: 1px solid #e2e8f0 !important;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08) !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05) !important;
             color: #1e293b !important;
         }
+        
+        /* Ajuste do Sidebar no Tema Claro */
+        html[data-theme="light"] .sidebar {
+            background: #ffffff !important;
+            border-right: 1px solid #e2e8f0 !important;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.05) !important;
+        }
+        html[data-theme="light"] .sidebar h5.text-white {
+            color: #1e293b !important;
+        }
+        html[data-theme="light"] .sidebar .nav-link {
+            color: #475569 !important;
+        }
+        html[data-theme="light"] .sidebar .nav-link i {
+            color: #64748b !important;
+        }
+        html[data-theme="light"] .sidebar .nav-link:hover {
+            background: #f1f5f9 !important;
+            color: #3b82f6 !important;
+            transform: translateX(5px);
+        }
+        html[data-theme="light"] .sidebar .nav-link:hover i {
+            color: #3b82f6 !important;
+        }
+        html[data-theme="light"] .sidebar .border-top {
+            border-color: #f1f5f9 !important;
+        }
+        html[data-theme="light"] .sidebar span.text-white {
+            color: #1e293b !important;
+        }
+        html[data-theme="light"] .sidebar small.text-secondary {
+            color: #64748b !important;
+        }
+        
+        /* Força texto escuro para elementos .text-white que estão em fundos claros */
+        html[data-theme="light"] .text-white:not(.btn *, .btn, .badge *, .badge, .bg-primary *, .bg-success *, .bg-danger *, .bg-warning *, .bg-info *, .bg-dark *, .bg-dark, .stats-card *, .stat-card-primary *, .stat-card-success *, .stat-card-warning *, .stat-card-info *, .alert:not(.alert-glass) *) {
+            color: #1e293b !important;
+        }
+
+        /* Sobrescreve fundos escuros definidos via style inline nas páginas */
+        html[data-theme="light"] div[style*="background: rgba(0,0,0"],
+        html[data-theme="light"] div[style*="background-color: rgba(0,0,0"],
+        html[data-theme="light"] span[style*="background: rgba(0,0,0"] {
+            background: #f1f5f9 !important;
+            background-color: #f1f5f9 !important;
+            color: #1e293b !important;
+            border-color: #cbd5e1 !important;
+        }
+        
+        html[data-theme="light"] div[style*="background: rgba(255, 255, 255, 0.03)"] {
+            background: #f8fafc !important;
+            border-color: #e2e8f0 !important;
+        }
+        
+        /* Ajuste de ícones nos inputs */
+        html[data-theme="light"] .input-group-text {
+            background: #e2e8f0 !important;
+            color: #475569 !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+
         /* Manter cores dos cards coloridos em ambos os temas */
         html[data-theme="light"] .card.bg-primary,
         html[data-theme="light"] .stats-card.bg-primary { background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important; color: #fff !important; border-color: transparent !important; }
@@ -374,13 +435,14 @@
             background-color: #f8fafc !important;
         }
         html[data-theme="light"] .table-hover > tbody > tr:hover > * {
-            background-color: #f0f4f8 !important;
+            background-color: #f1f5f9 !important;
             color: #1e293b !important;
         }
         html[data-theme="light"] .table thead th { color: #64748b !important; border-bottom-color: #e2e8f0 !important; }
         html[data-theme="light"] .table td,
         html[data-theme="light"] .table th { border-color: #e2e8f0 !important; }
         html[data-theme="light"] tfoot tr td { color: #1e293b !important; border-top-color: #cbd5e1 !important; }
+        
         html[data-theme="light"] .form-control,
         html[data-theme="light"] .form-select,
         html[data-theme="light"] .glass-input {
@@ -388,25 +450,46 @@
             border: 1px solid #cbd5e1 !important;
             color: #1e293b !important;
         }
-        html[data-theme="light"] .form-label { color: #64748b !important; }
+        html[data-theme="light"] .form-label { color: #475569 !important; }
         html[data-theme="light"] h1, html[data-theme="light"] h2,
         html[data-theme="light"] h3, html[data-theme="light"] h4,
-        html[data-theme="light"] h5, html[data-theme="light"] h6 { color: #1e293b; }
+        html[data-theme="light"] h5, html[data-theme="light"] h6 { color: #1e293b !important; }
         html[data-theme="light"] .border-bottom { border-color: #e2e8f0 !important; }
-        html[data-theme="light"] .text-secondary { color: #64748b !important; }
+        html[data-theme="light"] .text-secondary { color: #475569 !important; }
+        
         html[data-theme="light"] .modal-content {
             background: #ffffff !important;
-            border: 1px solid #e2e8f0 !important;
+            border: 1px solid #cbd5e1 !important;
             color: #1e293b !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important;
         }
         html[data-theme="light"] .modal-header,
         html[data-theme="light"] .modal-footer { border-color: #e2e8f0 !important; }
         html[data-theme="light"] .glass-table { color: #1e293b !important; }
-        html[data-theme="light"] .glass-table th { background: #f1f5f9 !important; color: #64748b !important; }
+        html[data-theme="light"] .glass-table th { background: #f1f5f9 !important; color: #475569 !important; }
         html[data-theme="light"] .glass-table td { border-bottom-color: #e2e8f0 !important; }
-        html[data-theme="light"] .glass-table-wrapper { background: #ffffff !important; border-color: #e2e8f0 !important; }
-        html[data-theme="light"] .glass-table tbody tr:hover { background: #f0f4f8 !important; }
-        html[data-theme="light"] .alert-glass { background: rgba(255,255,255,0.95) !important; color: #1e293b !important; }
+        html[data-theme="light"] .glass-table-wrapper { background: #ffffff !important; border-color: #cbd5e1 !important; }
+        html[data-theme="light"] .glass-table tbody tr:hover { background: #f1f5f9 !important; }
+        html[data-theme="light"] .alert-glass { background: #ffffff !important; color: #1e293b !important; border: 1px solid #e2e8f0 !important; }
+        
+        html[data-theme="light"] #sidebar-toggle-btn {
+            background: rgba(0,0,0,0.05) !important;
+            border: 1px solid rgba(0,0,0,0.1) !important;
+            color: #1e293b !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
+        }
+        html[data-theme="light"] #sidebar-toggle-btn:hover {
+            background: rgba(0,0,0,0.1) !important;
+        }
+
+        html[data-theme="light"] .theme-toggle-btn {
+            background: rgba(0,0,0,0.05) !important;
+            border: 1px solid rgba(0,0,0,0.1) !important;
+            color: #1e293b !important;
+        }
+        html[data-theme="light"] .theme-toggle-btn:hover {
+            background: rgba(0,0,0,0.1) !important;
+        }
 
         /* Botão toggle */
         .theme-toggle-btn {
